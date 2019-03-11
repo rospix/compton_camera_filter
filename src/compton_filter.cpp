@@ -121,7 +121,10 @@ namespace compton_camera_filter
     // --------------------------------------------------------------
 
     lkf_2D = new mrs_lib::Lkf(n_states_2D_, n_inputs_2D_, n_measurements_2D_, A_2D_, B_2D_, R_2D_, Q_2D_, P_2D_);
+    lkf_2D->setCovariance(initial_covariance_2D_);
+
     lkf_3D = new mrs_lib::Lkf(n_states_3D_, n_inputs_3D_, n_measurements_3D_, A_3D_, B_3D_, R_3D_, Q_3D_, P_3D_);
+    lkf_3D->setCovariance(initial_covariance_3D_);
 
     Eigen::Vector3d ground_point;
     ground_point << 0, 0, 0;
@@ -173,27 +176,41 @@ namespace compton_camera_filter
     state << lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2);
 
     // 3D
-
     Eigen::Vector3d projection = cone.ProjectPoint(state);
 
-    lkf_3D->setMeasurement(projection, Q_3D_);
+    Eigen::Vector3d unit;
+    unit << 1, 0, 0;
+    Eigen::Vector3d dir_to_proj = projection - state;
+    double proj_len = dir_to_proj.norm();
+
+    double angle = acos((dir_to_proj.dot(unit))/(dir_to_proj.norm()*unit.norm()));
+    Eigen::Vector3d axis = dir_to_proj.cross(unit);
+    Eigen::AngleAxis<double> my_quat(angle, axis);
+
+    Eigen::Matrix3d rot = my_quat.inverse().toRotationMatrix();
+
+    Eigen::Vector3d measurement;
+    measurement << proj_len, 0, 0;
+
+    lkf_3D->setP(rot);
+    lkf_3D->setMeasurement(measurement, Q_3D_);
     lkf_3D->doCorrection();
 
     // 2D
 
-    state << lkf_2D->getState(0), lkf_2D->getState(1), lkf_2D->getState(2);
+    /* state << lkf_2D->getState(0), lkf_2D->getState(1), lkf_2D->getState(2); */
 
-    boost::optional<Eigen::Vector3d> projection_2d = cone.ProjectPointOnPlane(ground_plane, state);
+    /* boost::optional<Eigen::Vector3d> projection_2d = cone.ProjectPointOnPlane(ground_plane, state); */
 
-    if (!projection_2d) {
+    /* if (!projection_2d) { */
 
-      ROS_INFO("[ComptonFilter]: not projection");
-    } else {
+    /*   ROS_INFO("[ComptonFilter]: not projection"); */
+    /* } else { */
 
-      ROS_INFO("[ComptonFilter]: fusing 2D");
-      lkf_2D->setMeasurement(projection_2d.get(), Q_2D_);
-      lkf_2D->doCorrection();
-    }
+    /*   ROS_INFO("[ComptonFilter]: fusing 2D"); */
+    /*   lkf_2D->setMeasurement(projection_2d.get(), Q_2D_); */
+    /*   lkf_2D->doCorrection(); */
+    /* } */
 
   }
 
