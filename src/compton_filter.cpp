@@ -184,16 +184,21 @@ namespace compton_camera_filter
     double proj_len = dir_to_proj.norm();
 
     double angle = acos((dir_to_proj.dot(unit))/(dir_to_proj.norm()*unit.norm()));
-    Eigen::Vector3d axis = dir_to_proj.cross(unit);
+    Eigen::Vector3d axis = unit.cross(dir_to_proj);
     Eigen::AngleAxis<double> my_quat(angle, axis);
 
-    Eigen::Matrix3d rot = my_quat.inverse().toRotationMatrix();
+    Eigen::Matrix3d rot = my_quat.toRotationMatrix();
 
-    Eigen::Vector3d measurement;
-    measurement << proj_len, 0, 0;
+    Q_3D_ << proj_len*proj_len, 0, 0,
+             0, 1e10, 0,
+             0, 0, 1e10;
 
-    lkf_3D->setP(rot);
-    lkf_3D->setMeasurement(measurement, Q_3D_);
+    Eigen::Matrix3d rot_cov = rot*Q_3D_*rot.transpose();
+
+    ROS_INFO_STREAM("[ComptonFilter]: rotated_cov: " << rot_cov);
+
+    /* lkf_3D->setP(rot); */
+    lkf_3D->setMeasurement(projection, rot_cov);
     lkf_3D->doCorrection();
 
     // 2D

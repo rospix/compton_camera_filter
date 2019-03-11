@@ -1,4 +1,4 @@
-main_timer_rate: 10.0 # [Hz]
+main_timer_rate: 1.0 # [Hz]
 
 kalman_2D:
   n_states: 2
@@ -37,9 +37,9 @@ kalman_3D:
   B: []
 
   # process noise
-  R: [0.05, 0, 0,
-      0, 0.05, 0,
-      0, 0, 0.05]
+  R: [1.0, 0, 0,
+      0, 1.0, 0,
+      0, 0, 1.0]
 
   # measurement covariance
   Q: [10.0, 0, 0,
@@ -51,6 +51,6 @@ kalman_3D:
       0, 1, 0,
       0, 0, 1]
 
-  initial_covariance: [10000.0, 0.0, 0.0,
-                       0.0, 10000.0, 0.0,
-                       0.0, 0.0, 10000.0]
+  initial_covariance: [190000.0, 0.0, 0.0,
+                       0.0, 100000.0, 0.0,
+                       0.0, 0.0, 100000.0]
