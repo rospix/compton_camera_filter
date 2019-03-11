@@ -26,7 +26,8 @@ namespace compton_camera_filter
     ros::NodeHandle nh_;
     bool            is_initialized = false;
 
-    ros::Publisher publisher_pose;
+    ros::Publisher publisher_pose_2D;
+    ros::Publisher publisher_pose_3D;
 
   private:
     ros::Subscriber subscriber_cone;
@@ -38,12 +39,20 @@ namespace compton_camera_filter
     void       mainTimer(const ros::TimerEvent &event);
 
   private:
-    Eigen::MatrixXd A_, B_, P_, Q_, R_;
-    double          n_states_, n_inputs_, n_measurements_;
-    mrs_lib::Lkf *  lkf;
-    std::mutex      mutex_lkf;
+    Eigen::MatrixXd A_2D_, B_2D_, P_2D_, Q_2D_, R_2D_;
+    double n_states_2D_, n_inputs_2D_, n_measurements_2D_;
+    mrs_lib::Lkf *lkf_2D;
+    std::mutex    mutex_lkf_2D;
 
-    Eigen::MatrixXd initial_covariance_;
+    Eigen::MatrixXd initial_covariance_2D_;
+
+  private:
+    Eigen::MatrixXd A_3D_, B_3D_, P_3D_, Q_3D_, R_3D_;
+    double n_states_3D_, n_inputs_3D_, n_measurements_3D_;
+    mrs_lib::Lkf *lkf_3D;
+    std::mutex    mutex_lkf_3D;
+
+    Eigen::MatrixXd initial_covariance_3D_;
 
   private:
     mrs_lib::Plane ground_plane;
@@ -64,17 +73,29 @@ namespace compton_camera_filter
 
     param_loader.load_param("main_timer_rate", main_timer_rate_);
 
-    param_loader.load_param("n_states", n_states_);
-    param_loader.load_param("n_inputs", n_inputs_);
-    param_loader.load_param("n_measurements", n_measurements_);
+    param_loader.load_param("kalman_2D/n_states", n_states_2D_);
+    param_loader.load_param("kalman_2D/n_inputs", n_inputs_2D_);
+    param_loader.load_param("kalman_2D/n_measurements", n_measurements_2D_);
 
-    param_loader.load_matrix_dynamic("A", A_, n_states_, n_states_);
-    param_loader.load_matrix_dynamic("B", B_, n_states_, n_inputs_);
-    param_loader.load_matrix_dynamic("R", R_, n_states_, n_states_);
-    param_loader.load_matrix_dynamic("P", P_, n_measurements_, n_states_);
-    param_loader.load_matrix_dynamic("Q", Q_, n_measurements_, n_measurements_);
+    param_loader.load_matrix_dynamic("kalman_2D/A", A_2D_, n_states_2D_, n_states_2D_);
+    param_loader.load_matrix_dynamic("kalman_2D/B", B_2D_, n_states_2D_, n_inputs_2D_);
+    param_loader.load_matrix_dynamic("kalman_2D/R", R_2D_, n_states_2D_, n_states_2D_);
+    param_loader.load_matrix_dynamic("kalman_2D/P", P_2D_, n_measurements_2D_, n_states_2D_);
+    param_loader.load_matrix_dynamic("kalman_2D/Q", Q_2D_, n_measurements_2D_, n_measurements_2D_);
 
-    param_loader.load_matrix_dynamic("initial_covariance", initial_covariance_, n_states_, n_states_);
+    param_loader.load_matrix_dynamic("kalman_2D/initial_covariance", initial_covariance_2D_, n_states_2D_, n_states_2D_);
+
+    param_loader.load_param("kalman_3D/n_states", n_states_3D_);
+    param_loader.load_param("kalman_3D/n_inputs", n_inputs_3D_);
+    param_loader.load_param("kalman_3D/n_measurements", n_measurements_3D_);
+
+    param_loader.load_matrix_dynamic("kalman_3D/A", A_3D_, n_states_3D_, n_states_3D_);
+    param_loader.load_matrix_dynamic("kalman_3D/B", B_3D_, n_states_3D_, n_inputs_3D_);
+    param_loader.load_matrix_dynamic("kalman_3D/R", R_3D_, n_states_3D_, n_states_3D_);
+    param_loader.load_matrix_dynamic("kalman_3D/P", P_3D_, n_measurements_3D_, n_states_3D_);
+    param_loader.load_matrix_dynamic("kalman_3D/Q", Q_3D_, n_measurements_3D_, n_measurements_3D_);
+
+    param_loader.load_matrix_dynamic("kalman_3D/initial_covariance", initial_covariance_3D_, n_states_3D_, n_states_3D_);
 
     // --------------------------------------------------------------
     // |                         subscribers                        |
@@ -86,7 +107,8 @@ namespace compton_camera_filter
     // |                         publishers                         |
     // --------------------------------------------------------------
 
-    publisher_pose = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose_out", 1);
+    publisher_pose_2D = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose_2D_out", 1);
+    publisher_pose_3D = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose_3D_out", 1);
 
     // --------------------------------------------------------------
     // |                           timers                           |
@@ -98,12 +120,16 @@ namespace compton_camera_filter
     // |                        Kalman filter                       |
     // --------------------------------------------------------------
 
-    lkf = new mrs_lib::Lkf(n_states_, n_inputs_, n_measurements_, A_, B_, R_, Q_, P_);
+    lkf_2D = new mrs_lib::Lkf(n_states_2D_, n_inputs_2D_, n_measurements_2D_, A_2D_, B_2D_, R_2D_, Q_2D_, P_2D_);
+    lkf_3D = new mrs_lib::Lkf(n_states_3D_, n_inputs_3D_, n_measurements_3D_, A_3D_, B_3D_, R_3D_, Q_3D_, P_3D_);
 
-    /* lkf->setState(0, 0); */
-    /* lkf->setState(1, 0); */
+    Eigen::Vector3d ground_point;
+    ground_point << 0, 0, 0;
 
-    ground_plane = mrs_lib::Plane(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 1));
+    Eigen::Vector3d ground_normal;
+    ground_normal << 0, 0, 1;
+
+    ground_plane = mrs_lib::Plane(ground_point, ground_normal);
 
     // | ----------------------- finish init ---------------------- |
 
@@ -132,35 +158,43 @@ namespace compton_camera_filter
 
     ROS_INFO_ONCE("[ComptonFilter]: getting cones");
 
-    std::scoped_lock lock(mutex_lkf);
+    std::scoped_lock lock(mutex_lkf_3D);
 
     Eigen::Vector3d position;
-    position << msg->pose.position.x,
-                msg->pose.position.y,
-                msg->pose.position.z;
+    position << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
 
     Eigen::Vector3d direction;
-    direction << msg->direction.x,
-                msg->direction.y,
-                msg->direction.z;
+    direction << msg->direction.x, msg->direction.y, msg->direction.z;
     direction.normalize();
 
     mrs_lib::Cone cone = mrs_lib::Cone(position, direction, msg->angle);
 
     Eigen::Vector3d state;
-    state << lkf->getState(0), lkf->getState(1), lkf->getState(2);
+    state << lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2);
 
-    /* boost::optional<Eigen::Vector3d> projection = cone.ProjectPointOnPlane(ground_plane, state); */
+    // 3D
+
     Eigen::Vector3d projection = cone.ProjectPoint(state);
 
-    /* if (!projection) { */
+    lkf_3D->setMeasurement(projection, Q_3D_);
+    lkf_3D->doCorrection();
 
-    /*   ROS_INFO("[ComptonFilter]: not projection"); */
-    /*   return; */
-    /* } */
+    // 2D
 
-    lkf->setMeasurement(projection, Q_);
-    lkf->doCorrection();
+    state << lkf_2D->getState(0), lkf_2D->getState(1), lkf_2D->getState(2);
+
+    boost::optional<Eigen::Vector3d> projection_2d = cone.ProjectPointOnPlane(ground_plane, state);
+
+    if (!projection_2d) {
+
+      ROS_INFO("[ComptonFilter]: not projection");
+    } else {
+
+      ROS_INFO("[ComptonFilter]: fusing 2D");
+      lkf_2D->setMeasurement(projection_2d.get(), Q_2D_);
+      lkf_2D->doCorrection();
+    }
+
   }
 
   //}
@@ -172,35 +206,73 @@ namespace compton_camera_filter
     if (!is_initialized)
       return;
 
-    lkf->iterateWithoutCorrection();
+    // | ------------------------ 2D kalman ----------------------- |
 
-    std::scoped_lock lock(mutex_lkf);
+    {
 
-    geometry_msgs::PoseWithCovarianceStamped pose_out;
+      std::scoped_lock lock(mutex_lkf_2D);
 
-    pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = "local_origin";
-    pose_out.pose.pose.position.x = lkf->getState(0);
-    pose_out.pose.pose.position.y = lkf->getState(1);
-    pose_out.pose.pose.position.z = lkf->getState(2);
+      lkf_2D->iterateWithoutCorrection();
 
-    Eigen::MatrixXd covariance = lkf->getCovariance();
+      geometry_msgs::PoseWithCovarianceStamped pose_out;
 
-    pose_out.pose.covariance[0] = covariance(0, 0);
-    pose_out.pose.covariance[1] = covariance(0, 1);
-    pose_out.pose.covariance[2] = covariance(0, 2);
-    pose_out.pose.covariance[6] = covariance(1, 0);
-    pose_out.pose.covariance[7] = covariance(1, 1);
-    pose_out.pose.covariance[8] = covariance(1, 2);
-    pose_out.pose.covariance[12] = covariance(2, 0);
-    pose_out.pose.covariance[13] = covariance(2, 1);
-    pose_out.pose.covariance[14] = covariance(2, 2);
+      pose_out.header.stamp         = ros::Time::now();
+      pose_out.header.frame_id      = "local_origin";
+      pose_out.pose.pose.position.x = lkf_2D->getState(0);
+      pose_out.pose.pose.position.y = lkf_2D->getState(1);
+      pose_out.pose.pose.position.z = 0;
 
-    try {
-      publisher_pose.publish(pose_out);
+      Eigen::MatrixXd covariance = lkf_2D->getCovariance();
+
+      pose_out.pose.covariance[0]  = covariance(0, 0);
+      pose_out.pose.covariance[1]  = covariance(0, 1);
+      pose_out.pose.covariance[2]  = 0;
+      pose_out.pose.covariance[6]  = covariance(1, 0);
+      pose_out.pose.covariance[7]  = covariance(1, 1);
+      pose_out.pose.covariance[8]  = 0;
+
+      try {
+        publisher_pose_2D.publish(pose_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_pose_2D.getTopic().c_str());
+      }
     }
-    catch (...) {
-      ROS_ERROR("Exception caught during publishing topic %s.", publisher_pose.getTopic().c_str());
+
+    // | ------------------------ 3D kalman ----------------------- |
+
+    {
+
+      std::scoped_lock lock(mutex_lkf_3D);
+
+      lkf_3D->iterateWithoutCorrection();
+
+      geometry_msgs::PoseWithCovarianceStamped pose_out;
+
+      pose_out.header.stamp         = ros::Time::now();
+      pose_out.header.frame_id      = "local_origin";
+      pose_out.pose.pose.position.x = lkf_3D->getState(0);
+      pose_out.pose.pose.position.y = lkf_3D->getState(1);
+      pose_out.pose.pose.position.z = lkf_3D->getState(2);
+
+      Eigen::MatrixXd covariance = lkf_3D->getCovariance();
+
+      pose_out.pose.covariance[0]  = covariance(0, 0);
+      pose_out.pose.covariance[1]  = covariance(0, 1);
+      pose_out.pose.covariance[2]  = covariance(0, 2);
+      pose_out.pose.covariance[6]  = covariance(1, 0);
+      pose_out.pose.covariance[7]  = covariance(1, 1);
+      pose_out.pose.covariance[8]  = covariance(1, 2);
+      pose_out.pose.covariance[12] = covariance(2, 0);
+      pose_out.pose.covariance[13] = covariance(2, 1);
+      pose_out.pose.covariance[14] = covariance(2, 2);
+
+      try {
+        publisher_pose_3D.publish(pose_out);
+      }
+      catch (...) {
+        ROS_ERROR("Exception caught during publishing topic %s.", publisher_pose_3D.getTopic().c_str());
+      }
     }
   }
 

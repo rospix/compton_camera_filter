@@ -4,7 +4,7 @@
 
   <group ns="$(arg uav_name)">
 
-    <node name="compton_filter" pkg="nodelet" type="nodelet" args="standalone compton_camera_filter/ComptonFilter" launch-prefix="debug_roslaunch" output="screen">
+    <node name="compton_filter" pkg="nodelet" type="nodelet" args="standalone compton_camera_filter/ComptonFilter" output="screen">
 
       <rosparam file="$(find compton_camera_filter)/config/simulation.yaml" command="load" />
 
@@ -12,7 +12,8 @@
       <remap from="~cone_in" to="compton_camera/cone" />
 
       <!-- advertised topics -->
-      <remap from="~pose_out" to="~pose" />
+      <remap from="~pose_2D_out" to="~pose_2D" />
+      <remap from="~pose_3D_out" to="~pose_3D" />
 
     </node>
 

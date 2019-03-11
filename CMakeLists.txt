@@ -1,11 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(compton_camera_filter)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
-
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -O3 -fopenmp -march=native")
-# set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fno-diagnostics-color")
 
 # include Eigen3
 find_package(Eigen3 REQUIRED)
