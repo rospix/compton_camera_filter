@@ -1,0 +1,30 @@
+main_timer_rate: 3 # [Hz]
+
+n_states: 3
+n_inputs: 0
+n_measurements: 3
+
+A: [1, 0, 0,
+    0, 1, 0,
+    0, 0, 1]
+
+B: []
+
+# process noise
+R: [1.0, 0, 0,
+    0, 1.0, 0,
+    0, 0, 1.0]
+
+# measurement noise
+Q: [1.0, 0, 0,
+    0, 1.0, 0,
+    0, 0, 1.0]
+
+# measurement mapping
+P: [1, 0, 0,
+    0, 1, 0,
+    0, 0, 1]
+
+initial_covariance: [100.0, 0.0, 0.0,
+                     0.0, 100.0, 0.0,
+                     0.0, 0.0, 100.0]

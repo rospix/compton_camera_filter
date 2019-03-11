@@ -1,0 +1,5 @@
+<library path="lib/libComptonFilter">
+  <class name="compton_camera_filter/ComptonFilter" type="compton_camera_filter::ComptonFilter" base_class_type="nodelet::Nodelet">
+    <description>ComptonFilter nodelet</description>
+  </class>
+</library>
