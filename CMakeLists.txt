@@ -21,7 +21,12 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   gazebo_rad_msgs
   mrs_lib
+  dynamic_reconfigure
 )
+
+generate_dynamic_reconfigure_options(
+  cfg/compton_filter.cfg
+  )
 
 catkin_package(
 #  INCLUDE_DIRS include
@@ -37,6 +42,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
+  ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
   )
 
 add_library(ComptonFilter src/compton_filter.cpp)

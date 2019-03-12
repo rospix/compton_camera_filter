@@ -13,6 +13,8 @@
 
 #include <mrs_lib/GeometryUtils.h>
 
+#include <compton_camera_filter/compton_filterConfig.h>
+
 namespace compton_camera_filter
 {
 
@@ -40,19 +42,38 @@ namespace compton_camera_filter
 
   private:
     Eigen::MatrixXd A_2D_, B_2D_, P_2D_, Q_2D_, R_2D_;
-    double n_states_2D_, n_inputs_2D_, n_measurements_2D_;
-    mrs_lib::Lkf *lkf_2D;
-    std::mutex    mutex_lkf_2D;
+    double          n_states_2D_, n_inputs_2D_, n_measurements_2D_;
+    mrs_lib::Lkf *  lkf_2D;
+    std::mutex      mutex_lkf_2D;
 
     Eigen::MatrixXd initial_covariance_2D_;
 
   private:
     Eigen::MatrixXd A_3D_, B_3D_, P_3D_, Q_3D_, R_3D_;
-    double n_states_3D_, n_inputs_3D_, n_measurements_3D_;
-    mrs_lib::Lkf *lkf_3D;
-    std::mutex    mutex_lkf_3D;
+    double          n_states_3D_, n_inputs_3D_, n_measurements_3D_;
+    mrs_lib::Lkf *  lkf_3D;
+    std::mutex      mutex_lkf_3D;
+    Eigen::MatrixXd initial_state_3D_;
 
     Eigen::MatrixXd initial_covariance_3D_;
+
+  private:
+    // --------------------------------------------------------------
+    // |                     dynamic reconfigure                    |
+    // --------------------------------------------------------------
+
+    double q_2D_, r_2D_;
+    double q_3D_, r_3D_;
+
+    boost::recursive_mutex                              config_mutex_;
+    typedef compton_camera_filter::compton_filterConfig Config;
+    typedef dynamic_reconfigure::Server<Config>         ReconfigureServer;
+    boost::shared_ptr<ReconfigureServer>                reconfigure_server_;
+    void                                                drs_callback(compton_camera_filter::compton_filterConfig &config, uint32_t level);
+    compton_camera_filter::compton_filterConfig         drs_compton_filter;
+
+    void       dynamicReconfigureCallback(compton_camera_filter::compton_filterConfig &config, uint32_t level);
+    std::mutex mutex_drs;
 
   private:
     mrs_lib::Plane ground_plane;
@@ -77,6 +98,9 @@ namespace compton_camera_filter
     param_loader.load_param("kalman_2D/n_inputs", n_inputs_2D_);
     param_loader.load_param("kalman_2D/n_measurements", n_measurements_2D_);
 
+    param_loader.load_param("kalman_2D/r", r_2D_);
+    param_loader.load_param("kalman_2D/q", q_2D_);
+
     param_loader.load_matrix_dynamic("kalman_2D/A", A_2D_, n_states_2D_, n_states_2D_);
     param_loader.load_matrix_dynamic("kalman_2D/B", B_2D_, n_states_2D_, n_inputs_2D_);
     param_loader.load_matrix_dynamic("kalman_2D/R", R_2D_, n_states_2D_, n_states_2D_);
@@ -94,6 +118,11 @@ namespace compton_camera_filter
     param_loader.load_matrix_dynamic("kalman_3D/R", R_3D_, n_states_3D_, n_states_3D_);
     param_loader.load_matrix_dynamic("kalman_3D/P", P_3D_, n_measurements_3D_, n_states_3D_);
     param_loader.load_matrix_dynamic("kalman_3D/Q", Q_3D_, n_measurements_3D_, n_measurements_3D_);
+
+    param_loader.load_matrix_dynamic("kalman_3D/initial_states", initial_state_3D_, n_states_3D_, 1);
+
+    param_loader.load_param("kalman_3D/r", r_3D_);
+    param_loader.load_param("kalman_3D/q", q_3D_);
 
     param_loader.load_matrix_dynamic("kalman_3D/initial_covariance", initial_covariance_3D_, n_states_3D_, n_states_3D_);
 
@@ -125,6 +154,7 @@ namespace compton_camera_filter
 
     lkf_3D = new mrs_lib::Lkf(n_states_3D_, n_inputs_3D_, n_measurements_3D_, A_3D_, B_3D_, R_3D_, Q_3D_, P_3D_);
     lkf_3D->setCovariance(initial_covariance_3D_);
+    lkf_3D->setStates(initial_state_3D_);
 
     Eigen::Vector3d ground_point;
     ground_point << 0, 0, 0;
@@ -133,6 +163,20 @@ namespace compton_camera_filter
     ground_normal << 0, 0, 1;
 
     ground_plane = mrs_lib::Plane(ground_point, ground_normal);
+
+    // --------------------------------------------------------------
+    // |                     dynamic reconfigure                    |
+    // --------------------------------------------------------------
+
+    drs_compton_filter.q_2D = q_2D_;
+    drs_compton_filter.r_2D = r_2D_;
+    drs_compton_filter.q_3D = q_3D_;
+    drs_compton_filter.r_3D = r_3D_;
+
+    reconfigure_server_.reset(new ReconfigureServer(config_mutex_, nh_));
+    reconfigure_server_->updateConfig(drs_compton_filter);
+    ReconfigureServer::CallbackType f = boost::bind(&ComptonFilter::dynamicReconfigureCallback, this, _1, _2);
+    reconfigure_server_->setCallback(f);
 
     // | ----------------------- finish init ---------------------- |
 
@@ -163,60 +207,65 @@ namespace compton_camera_filter
 
     std::scoped_lock lock(mutex_lkf_3D);
 
-    Eigen::Vector3d position;
-    position << msg->pose.position.x, msg->pose.position.y, msg->pose.position.z;
+    Eigen::Vector3d cone_position(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    Eigen::Vector3d cone_direction(msg->direction.x, msg->direction.y, msg->direction.z);
+    cone_direction.normalize();
 
-    Eigen::Vector3d direction;
-    direction << msg->direction.x, msg->direction.y, msg->direction.z;
-    direction.normalize();
+    mrs_lib::Cone cone = mrs_lib::Cone(cone_position, cone_direction, msg->angle);
 
-    mrs_lib::Cone cone = mrs_lib::Cone(position, direction, msg->angle);
+    // | --------------------------- 3D --------------------------- |
+    Eigen::Vector3d state_3D(lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2));
+    Eigen::Vector3d projection = cone.ProjectPoint(state_3D);
 
-    Eigen::Vector3d state;
-    state << lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2);
+    Eigen::Vector3d unit(1, 0, 0);
+    Eigen::Vector3d dir_to_proj = projection - state_3D;
 
-    // 3D
-    Eigen::Vector3d projection = cone.ProjectPoint(state);
-
-    Eigen::Vector3d unit;
-    unit << 1, 0, 0;
-    Eigen::Vector3d dir_to_proj = projection - state;
-    double proj_len = dir_to_proj.norm();
-
-    double angle = acos((dir_to_proj.dot(unit))/(dir_to_proj.norm()*unit.norm()));
-    Eigen::Vector3d axis = unit.cross(dir_to_proj);
+    // construct the covariance rotation
+    double                   angle = acos((dir_to_proj.dot(unit)) / (dir_to_proj.norm() * unit.norm()));
+    Eigen::Vector3d          axis  = unit.cross(dir_to_proj);
     Eigen::AngleAxis<double> my_quat(angle, axis);
-
     Eigen::Matrix3d rot = my_quat.toRotationMatrix();
 
-    Q_3D_ << proj_len*proj_len, 0, 0,
-             0, 1e10, 0,
-             0, 0, 1e10;
+    // rotate the covariance
+    Eigen::Matrix3d rot_cov = rot * Q_3D_ * rot.transpose();
 
-    Eigen::Matrix3d rot_cov = rot*Q_3D_*rot.transpose();
-
-    ROS_INFO_STREAM("[ComptonFilter]: rotated_cov: " << rot_cov);
-
-    /* lkf_3D->setP(rot); */
     lkf_3D->setMeasurement(projection, rot_cov);
-    lkf_3D->doCorrection();
+    lkf_3D->iterate();
 
-    // 2D
+    // | --------------------------- 2D --------------------------- |
 
-    /* state << lkf_2D->getState(0), lkf_2D->getState(1), lkf_2D->getState(2); */
+    Eigen::Vector3d state_2D(lkf_2D->getState(0), lkf_2D->getState(1), 0);
+    Eigen::Vector3d projection_2D = cone.ProjectPoint(state_2D);
 
-    /* boost::optional<Eigen::Vector3d> projection_2d = cone.ProjectPointOnPlane(ground_plane, state); */
+    // project it down to the ground
+    projection_2D(2) = 0;
 
-    /* if (!projection_2d) { */
+    dir_to_proj = projection_2D - state_2D;
 
-    /*   ROS_INFO("[ComptonFilter]: not projection"); */
-    /* } else { */
+    // construct the covariance rotation
+    angle = acos((dir_to_proj.dot(unit)) / (dir_to_proj.norm() * unit.norm()));
+    axis  = unit.cross(dir_to_proj);
+    Eigen::AngleAxis<double> my_quat2(angle, axis);
+    rot = my_quat2.toRotationMatrix();
 
-    /*   ROS_INFO("[ComptonFilter]: fusing 2D"); */
-    /*   lkf_2D->setMeasurement(projection_2d.get(), Q_2D_); */
-    /*   lkf_2D->doCorrection(); */
-    /* } */
+    // rotate the covariance
+    Eigen::Matrix3d Q_2D_in_3D = Eigen::MatrixXd::Zero(3, 3);
+    Q_2D_in_3D.block(0, 0, 2, 2) = Q_2D_;
+    Q_2D_in_3D(2, 2) = Q_2D_in_3D(1, 1);
 
+    rot_cov = rot * Q_2D_in_3D * rot.transpose();
+    Eigen::Matrix2d cov_2D = rot_cov.block(0, 0, 2, 2);
+
+    /* cov_2D << q_2D_, 0, */
+    /*           0, q_2D_; */
+
+    Eigen::Vector2d measurement(projection_2D(0), projection_2D(1));
+
+    ROS_INFO("[ComptonFilter]: state %f %f", state_2D(0), state_2D(1));
+    ROS_INFO("[ComptonFilter]: measurement %f %f", measurement(0), measurement(1));
+
+    lkf_2D->setMeasurement(measurement, cov_2D);
+    lkf_2D->iterate();
   }
 
   //}
@@ -234,8 +283,6 @@ namespace compton_camera_filter
 
       std::scoped_lock lock(mutex_lkf_2D);
 
-      lkf_2D->iterateWithoutCorrection();
-
       geometry_msgs::PoseWithCovarianceStamped pose_out;
 
       pose_out.header.stamp         = ros::Time::now();
@@ -246,12 +293,12 @@ namespace compton_camera_filter
 
       Eigen::MatrixXd covariance = lkf_2D->getCovariance();
 
-      pose_out.pose.covariance[0]  = covariance(0, 0);
-      pose_out.pose.covariance[1]  = covariance(0, 1);
-      pose_out.pose.covariance[2]  = 0;
-      pose_out.pose.covariance[6]  = covariance(1, 0);
-      pose_out.pose.covariance[7]  = covariance(1, 1);
-      pose_out.pose.covariance[8]  = 0;
+      pose_out.pose.covariance[0] = covariance(0, 0);
+      pose_out.pose.covariance[1] = covariance(0, 1);
+      pose_out.pose.covariance[2] = 0;
+      pose_out.pose.covariance[6] = covariance(1, 0);
+      pose_out.pose.covariance[7] = covariance(1, 1);
+      pose_out.pose.covariance[8] = 0;
 
       try {
         publisher_pose_2D.publish(pose_out);
@@ -266,8 +313,6 @@ namespace compton_camera_filter
     {
 
       std::scoped_lock lock(mutex_lkf_3D);
-
-      lkf_3D->iterateWithoutCorrection();
 
       geometry_msgs::PoseWithCovarianceStamped pose_out;
 
@@ -296,6 +341,46 @@ namespace compton_camera_filter
         ROS_ERROR("Exception caught during publishing topic %s.", publisher_pose_3D.getTopic().c_str());
       }
     }
+  }
+
+  //}
+
+  /* dynamicReconfigureCallback() //{ */
+
+  void ComptonFilter::dynamicReconfigureCallback(compton_camera_filter::compton_filterConfig &config, [[maybe_unused]] uint32_t level) {
+
+    {
+      std::scoped_lock lock(mutex_drs);
+
+      q_2D_ = config.q_2D;
+      r_2D_ = config.r_2D;
+
+      q_3D_ = config.q_3D;
+      r_3D_ = config.r_3D;
+    }
+
+    {
+      std::scoped_lock lock(mutex_lkf_3D);
+
+      R_3D_(0, 0) = r_3D_;
+      R_3D_(1, 1) = r_3D_;
+      R_3D_(2, 2) = r_3D_;
+      lkf_3D->setR(R_3D_);
+
+      Q_3D_(0, 0) = q_3D_;
+    }
+
+    {
+      std::scoped_lock lock(mutex_lkf_2D);
+
+      R_2D_(0, 0) = r_2D_;
+      R_2D_(1, 1) = r_2D_;
+      lkf_2D->setR(R_2D_);
+
+      Q_2D_(0, 0) = q_2D_;
+    }
+
+    ROS_INFO("[ComptonFilter]: updated covariances");
   }
 
   //}
