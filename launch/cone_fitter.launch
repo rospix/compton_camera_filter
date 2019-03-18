@@ -1,0 +1,19 @@
+<launch>
+
+  <arg name="uav_name" default="$(optenv UAV_NAME uav)"/>
+
+  <group ns="$(arg uav_name)">
+
+    <node name="cone_fitter" pkg="compton_camera_filter" type="cone_fitter.py" output="screen">
+
+      <!-- subscribed topics -->
+      <remap from="~cone_in" to="compton_camera/cone" />
+
+      <!-- advertised topics -->
+      <remap from="~pose_out" to="~pose" />
+
+    </node>
+
+  </group>
+
+</launch>
