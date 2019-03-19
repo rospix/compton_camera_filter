@@ -6,7 +6,7 @@
 
     <node name="compton_filter" pkg="nodelet" type="nodelet" args="standalone compton_camera_filter/ComptonFilter" output="screen">
 
-      <rosparam file="$(find compton_camera_filter)/config/simulation.yaml" command="load" />
+      <rosparam file="$(find compton_camera_filter)/config/kalman.yaml" command="load" />
 
       <!-- subscribed topics -->
       <remap from="~cone_in" to="compton_camera/cone" />

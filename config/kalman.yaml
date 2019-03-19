@@ -1,0 +1,62 @@
+main_timer_rate: 1.0 # [Hz]
+
+kalman_2D:
+  n_states: 2
+  n_inputs: 0
+  n_measurements: 2
+
+  A: [1, 0,
+      0, 1]
+
+  B: []
+
+  # process noise
+  r: 30
+  R: [0.01, 0,
+      0, 0.01]
+
+  # measurement noise
+  q: 30.0
+  Q: [1.0, 0,
+      0, 1000000000.0]
+
+  # measurement mapping
+  P: [1, 0,
+      0, 1]
+
+  initial_covariance: [100000.0, 0.0,
+                       0.0, 100000.0]
+
+kalman_3D:
+  n_states: 3
+  n_inputs: 0
+  n_measurements: 3
+
+  initial_states: [0, 0, 0.0]
+
+  initial_covariance: [1000000.0, 0.0, 0.0,
+                       0.0, 1000000.0, 0.0,
+                       0.0, 0.0, 1000000.0]
+
+  A: [1, 0, 0,
+      0, 1, 0,
+      0, 0, 1]
+
+  B: []
+
+  # process noise
+  r: 30.0
+  R: [100.0, 0, 0,
+      0, 100.0, 0,
+      0, 0, 100.0]
+
+  # measurement covariance
+  q: 30.0
+  Q: [10.0, 0, 0,
+      0, 1000000000, 0,
+      0, 0, 1000000000]
+
+  # measurement mapping
+  P: [1, 0, 0,
+      0, 1, 0,
+      0, 0, 1]
