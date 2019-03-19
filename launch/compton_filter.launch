@@ -10,10 +10,15 @@
 
       <!-- subscribed topics -->
       <remap from="~cone_in" to="compton_camera/cone" />
+      <remap from="~optimizer_in" to="cone_optimizer/pose" />
 
       <!-- advertised topics -->
       <remap from="~pose_2D_out" to="~pose_2D" />
       <remap from="~pose_3D_out" to="~pose_3D" />
+
+      <!-- services -->
+      <remap from="~search_out" to="trajectory_planner/search" />
+      <remap from="~reset_out" to="cone_optimizer/reset" />
 
     </node>
 

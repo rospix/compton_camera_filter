@@ -15,6 +15,8 @@
 
 #include <compton_camera_filter/compton_filterConfig.h>
 
+#include <std_srvs/Trigger.h>
+
 namespace compton_camera_filter
 {
 
@@ -31,9 +33,20 @@ namespace compton_camera_filter
     ros::Publisher publisher_pose_2D;
     ros::Publisher publisher_pose_3D;
 
+    ros::ServiceClient service_client_search;
+    ros::ServiceClient service_client_reset;
+
   private:
     ros::Subscriber subscriber_cone;
     void            callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg);
+
+  private:
+    ros::Subscriber subscriber_optimizer;
+    void            callbackOptimizer(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
+    bool            got_optimizer = false;
+    std::mutex      mutex_optimizer;
+
+    geometry_msgs::PoseWithCovarianceStamped optimizer;
 
   private:
     ros::Timer main_timer;
@@ -41,6 +54,8 @@ namespace compton_camera_filter
     void       mainTimer(const ros::TimerEvent &event);
 
   private:
+    bool kalman_initialized = false;
+
     Eigen::MatrixXd A_2D_, B_2D_, P_2D_, Q_2D_, R_2D_;
     double          n_states_2D_, n_inputs_2D_, n_measurements_2D_;
     mrs_lib::Lkf *  lkf_2D;
@@ -130,7 +145,8 @@ namespace compton_camera_filter
     // |                         subscribers                        |
     // --------------------------------------------------------------
 
-    subscriber_cone = nh_.subscribe("cone_in", 1, &ComptonFilter::callbackCone, this, ros::TransportHints().tcpNoDelay());
+    subscriber_cone      = nh_.subscribe("cone_in", 1, &ComptonFilter::callbackCone, this, ros::TransportHints().tcpNoDelay());
+    subscriber_optimizer = nh_.subscribe("optimizer_in", 1, &ComptonFilter::callbackOptimizer, this, ros::TransportHints().tcpNoDelay());
 
     // --------------------------------------------------------------
     // |                         publishers                         |
@@ -138,6 +154,13 @@ namespace compton_camera_filter
 
     publisher_pose_2D = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose_2D_out", 1);
     publisher_pose_3D = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose_3D_out", 1);
+
+    // --------------------------------------------------------------
+    // |                       service clients                      |
+    // --------------------------------------------------------------
+
+    service_client_search = nh_.serviceClient<std_srvs::Trigger>("search_out");
+    service_client_reset = nh_.serviceClient<std_srvs::Trigger>("reset_out");
 
     // --------------------------------------------------------------
     // |                           timers                           |
@@ -203,6 +226,10 @@ namespace compton_camera_filter
     if (!is_initialized)
       return;
 
+    if (!kalman_initialized) {
+      return;
+    }
+
     ROS_INFO_ONCE("[ComptonFilter]: getting cones");
 
     std::scoped_lock lock(mutex_lkf_3D);
@@ -220,11 +247,29 @@ namespace compton_camera_filter
     Eigen::Vector3d unit(1, 0, 0);
     Eigen::Vector3d dir_to_proj = projection - state_3D;
 
+    if (dir_to_proj.norm() > 15.0) {
+
+      std::scoped_lock lock(mutex_optimizer);
+
+      Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
+      new_cov3 << optimizer.pose.covariance[0], 0, 0, 0, optimizer.pose.covariance[7], 0, 0, 0, optimizer.pose.covariance[14];
+
+      lkf_3D->setCovariance(new_cov3);
+
+      std_srvs::Trigger search_out;
+      service_client_reset.call(search_out);
+      service_client_search.call(search_out);
+
+      kalman_initialized = false;
+
+      ROS_INFO("[ComptonFilter]: calling service for searching");
+    }
+
     // construct the covariance rotation
     double                   angle = acos((dir_to_proj.dot(unit)) / (dir_to_proj.norm() * unit.norm()));
     Eigen::Vector3d          axis  = unit.cross(dir_to_proj);
     Eigen::AngleAxis<double> my_quat(angle, axis);
-    Eigen::Matrix3d rot = my_quat.toRotationMatrix();
+    Eigen::Matrix3d          rot = my_quat.toRotationMatrix();
 
     // rotate the covariance
     Eigen::Matrix3d rot_cov = rot * Q_3D_ * rot.transpose();
@@ -249,11 +294,11 @@ namespace compton_camera_filter
     rot = my_quat2.toRotationMatrix();
 
     // rotate the covariance
-    Eigen::Matrix3d Q_2D_in_3D = Eigen::MatrixXd::Zero(3, 3);
+    Eigen::Matrix3d Q_2D_in_3D   = Eigen::MatrixXd::Zero(3, 3);
     Q_2D_in_3D.block(0, 0, 2, 2) = Q_2D_;
-    Q_2D_in_3D(2, 2) = Q_2D_in_3D(1, 1);
+    Q_2D_in_3D(2, 2)             = Q_2D_in_3D(1, 1);
 
-    rot_cov = rot * Q_2D_in_3D * rot.transpose();
+    rot_cov                = rot * Q_2D_in_3D * rot.transpose();
     Eigen::Matrix2d cov_2D = rot_cov.block(0, 0, 2, 2);
 
     /* cov_2D << q_2D_, 0, */
@@ -270,12 +315,58 @@ namespace compton_camera_filter
 
   //}
 
+  /* callbackOptimizer() //{ */
+
+  void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg) {
+
+    if (!is_initialized) {
+      return;
+    }
+
+    std::scoped_lock lock(mutex_optimizer);
+
+    got_optimizer = true;
+
+    optimizer = *msg;
+
+    if (!kalman_initialized) {
+
+      ROS_INFO("[ComptonFilter]: initializing KF");
+
+      Eigen::Vector2d new_state2;
+      new_state2 << msg->pose.pose.position.x, msg->pose.pose.position.z;
+
+      Eigen::MatrixXd new_cov2 = Eigen::MatrixXd::Zero(n_states_2D_, n_states_2D_);
+      new_cov2 << msg->pose.covariance[0], 0, 0, msg->pose.covariance[7];
+
+      lkf_2D->setStates(new_state2);
+      lkf_2D->setCovariance(new_cov2);
+
+      Eigen::Vector3d new_state3;
+      new_state3 << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
+
+      Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
+      new_cov3 << msg->pose.covariance[0], 0, 0, 0, msg->pose.covariance[7], 0, 0, 0, msg->pose.covariance[14];
+
+      lkf_3D->setStates(new_state3);
+      lkf_3D->setCovariance(new_cov3);
+
+      kalman_initialized = true;
+    }
+  }
+
+  //}
+
   /* mainTimer() //{ */
 
   void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
 
     if (!is_initialized)
       return;
+
+    if (!kalman_initialized) {
+      return;
+    }
 
     // | ------------------------ 2D kalman ----------------------- |
 

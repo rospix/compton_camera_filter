@@ -3,3 +3,9 @@
     <description>ComptonFilter nodelet</description>
   </class>
 </library>
+
+<library path="lib/libTrajectoryPlanner">
+  <class name="compton_camera_filter/TrajectoryPlanner" type="compton_camera_filter::TrajectoryPlanner" base_class_type="nodelet::Nodelet">
+    <description>TrajectoryPlanner nodelet</description>
+  </class>
+</library>

@@ -10,7 +10,13 @@ import scipy.optimize as op
 import time
 
 from gazebo_rad_msgs.msg import Cone as ConeMsg
-from geometry_msgs.msg import PoseStamped as PoseStampedMsg
+from geometry_msgs.msg import PoseWithCovarianceStamped as PoseWithCovarianceStampedMsg
+
+from std_srvs.srv import SetBool as SetBoolSrv
+from std_srvs.srv import Trigger as TriggerSrv
+
+from std_srvs.srv import SetBoolResponse as SetBoolSrvReponse
+from std_srvs.srv import TriggerResponse as TriggerSrvResponse
 
 class ConeFitter:
 
@@ -56,7 +62,7 @@ class ConeFitter:
             center = cc[idx]
             direction = dd[idx]
     
-            cons.append({'type': 'ineq', 'fun': lambda x: direction[0]*x[0] + direction[1]*x[1] + direction[2]*x[2] - (direction[0]*center[0] + direction[1]*center[1] + direction[2]*center[2])})
+            cons.append({'type': 'ineq', 'fun': lambda x: +(direction[0]*(x[0]+direction[0]*self.constraint_offset) + direction[1]*(x[1]+direction[1]*self.constraint_offset) + direction[2]*(x[2]+direction[2]*self.constraint_offset) - (direction[0]*center[0] + direction[1]*center[1] + direction[2]*center[2]))})
     
         return cons
     
@@ -136,22 +142,29 @@ class ConeFitter:
     def __init__(self):
 
         self.is_initialized = False
+        self.is_enabled = True
     
         rospy.init_node('cone_fitter', anonymous=True)
     
         # parameters
         self.cone_num = rospy.get_param('~cone_num')
+        self.constraint_offset = rospy.get_param('~constraint_offset')
 
+        # subscribers
         rospy.Subscriber("~cone_in", ConeMsg, self.callbackCone, queue_size=1)
+
+        # services
+        self.service_server_enable = rospy.Service('~enable_in', SetBoolSrv, self.callbackEnable)
+        self.service_server_reset = rospy.Service('~reset_in', TriggerSrv, self.callbackReset)
+
+        # publishers
+        self.publisher_cones = rospy.Publisher("~pose_out", PoseWithCovarianceStampedMsg, queue_size=1)
 
         self.got_cone = False
         self.got_new_cone = False
 
         self.cones = []
     
-        # publishers
-        self.publisher_cones = rospy.Publisher("~pose_out", PoseStampedMsg, queue_size=1)
-
         self.sy_x = sy.symbols('x y z')
         self.sy_center = sy.symbols('a b c')
         self.sy_direction = sy.symbols('o p q')
@@ -180,16 +193,60 @@ class ConeFitter:
 
         self.cones.append(data)
 
-        if len(self.cones) > self.cone_num+1:
+        if len(self.cones) > self.cone_num:
             self.cones.pop(0)
 
         self.got_new_cone = True
 
     # #} end of callbackCone()
 
+    # #{ callbackEnable()
+    
+    def callbackEnable(self, req):
+
+        if not self.is_initialized:
+            return 
+    
+        self.is_enabled = req.data
+
+        if self.is_enabled:
+            rospy.loginfo('[Optimizer]: enabled')
+        else:
+            rospy.loginfo('[Optimizer]: disabled')
+
+        resp = SetBoolSrvResponse()
+        resp.message = ""
+        resp.success = True
+
+        return resp
+    
+    # #} end of callbackEnable
+    
+    # #{ callbackReset()
+    
+    def callbackReset(self, req):
+
+        if not self.is_initialized:
+            return 
+    
+        self.cones = []
+
+        rospy.loginfo('[Optimizer]: resetting')
+
+        resp = TriggerSrvResponse()
+        resp.message = ""
+        resp.success = True
+
+        return resp
+    
+    # #} end of callbackEnable
+
     def mainTimer(self, event):
 
         if not self.is_initialized:
+            return 
+
+        if not self.is_enabled:
             return 
 
         if len(self.cones) < self.cone_num:
@@ -200,6 +257,8 @@ class ConeFitter:
             return
 
         self.got_new_cone = False
+
+        rospy.loginfo('optimizing')
 
         time_start = rospy.Time.now()
 
@@ -212,8 +271,6 @@ class ConeFitter:
             directions.append([cone.direction.x, cone.direction.y, cone.direction.z]) 
             thetas.append(cone.angle)
 
-        time_before_lamdification = rospy.Time.now()
-
         self.func = self.multiConeDist(centers, directions, thetas)
         self.cons = self.constraints(centers, directions)
 
@@ -222,6 +279,9 @@ class ConeFitter:
         self.J = [self.func.diff(var) for var in self.sy_x]
         # self.H = [[self.func.diff(var1).diff(var2) for var1 in self.sy_x] for var2 in self.sy_x]
 
+        time_before_lamdification = rospy.Time.now()
+
+        # lamdification        
         f = sy.lambdify(self.sy_x, self.func, "math")
         jac = sy.lambdify(self.sy_x, self.J, "math")
 
@@ -235,15 +295,33 @@ class ConeFitter:
 
         res = op.minimize(f_v, [0, 0, 0], method="SLSQP", jac=jac_v, options={'disp': False}, constraints=self.cons)
 
+        if len(self.cones) < self.cone_num:
+          return
+
+        # calculate the maximum distance to any of the cones
+        max_distance = 0
+        for idx,cone in enumerate(self.cones):
+
+            cone_dist = self.coneDist([cone.pose.position.x, cone.pose.position.y, cone.pose.position.z], [cone.direction.x, cone.direction.y, cone.direction.z], cone.angle)
+            dist = self.subs_scal(cone_dist, self.sy_x, res.x)
+
+            if dist > max_distance:
+                max_distance = dist
+
         time_after_optimization = rospy.Time.now()
 
-        rospy.loginfo('Optimized for {} cones: total time {}, initialization {}, jacobian {}, lamdification {}, optimization {}'.format(len(self.cones), (time_after_optimization - time_start).to_sec(), (time_before_J - time_start).to_sec(), (time_before_lamdification - time_before_J).to_sec(), (time_before_optimization - time_before_lamdification).to_sec(), (time_after_optimization - time_before_optimization).to_sec()))
+        rospy.loginfo('Optimized for {} cones, max distance {}: total time {}, initialization {}, jacobian {}, lamdification {}, optimization {}'.format(len(self.cones), max_distance, (time_after_optimization - time_start).to_sec(), (time_before_J - time_start).to_sec(), (time_before_lamdification - time_before_J).to_sec(), (time_before_optimization - time_before_lamdification).to_sec(), (time_after_optimization - time_before_optimization).to_sec()))
 
-        msg_out = PoseStampedMsg()
+        msg_out = PoseWithCovarianceStampedMsg()
         msg_out.header.frame_id = "local_origin"
-        msg_out.pose.position.x = res.x[0]
-        msg_out.pose.position.y = res.x[1]
-        msg_out.pose.position.z = res.x[2]
+        msg_out.header.stamp = rospy.Time.now()
+        msg_out.pose.pose.position.x = res.x[0]
+        msg_out.pose.pose.position.y = res.x[1]
+        msg_out.pose.pose.position.z = res.x[2]
+        msg_out.pose.pose.orientation.z = 1.0
+        msg_out.pose.covariance[0] = max_distance*max_distance
+        msg_out.pose.covariance[7] = max_distance*max_distance
+        msg_out.pose.covariance[14] = max_distance*max_distance
         self.publisher_cones.publish(msg_out)
 
 if __name__ == '__main__':

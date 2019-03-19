@@ -1,1 +1,2 @@
-cone_num: 5
+cone_num: 8
+constraint_offset: 0.0 # does not work (and does not make sense)

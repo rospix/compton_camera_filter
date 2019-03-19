@@ -24,8 +24,8 @@ kalman_2D:
   P: [1, 0,
       0, 1]
 
-  initial_covariance: [100000.0, 0.0,
-                       0.0, 100000.0]
+  initial_covariance: [10000.0, 0.0,
+                       0.0, 10000.0]
 
 kalman_3D:
   n_states: 3
@@ -34,9 +34,9 @@ kalman_3D:
 
   initial_states: [0, 0, 0.0]
 
-  initial_covariance: [1000000.0, 0.0, 0.0,
-                       0.0, 1000000.0, 0.0,
-                       0.0, 0.0, 1000000.0]
+  initial_covariance: [100000.0, 0.0, 0.0,
+                       0.0, 100000.0, 0.0,
+                       0.0, 0.0, 100000.0]
 
   A: [1, 0, 0,
       0, 1, 0,

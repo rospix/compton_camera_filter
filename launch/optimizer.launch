@@ -4,7 +4,7 @@
 
   <group ns="$(arg uav_name)">
 
-    <node name="cone_fitter" pkg="compton_camera_filter" type="cone_fitter.py" output="screen">
+    <node name="cone_optimizer" pkg="compton_camera_filter" type="optimizer.py" output="screen">
 
       <rosparam file="$(find compton_camera_filter)/config/optimizer.yaml" command="load" />
 
@@ -13,6 +13,10 @@
 
       <!-- advertised topics -->
       <remap from="~pose_out" to="~pose" />
+
+      <!-- services -->
+      <remap from="~enable_in" to="~enable" />
+      <remap from="~reset_in" to="~reset" />
 
     </node>
 
