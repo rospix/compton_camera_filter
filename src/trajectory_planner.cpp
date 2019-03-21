@@ -334,7 +334,7 @@ namespace compton_camera_filter
       new_point.x   = 0 + searching_radius_ * cos(current_angle);
       new_point.y   = 0 + searching_radius_ * sin(current_angle);
       new_point.z   = searching_height_;
-      new_point.yaw = atan2(new_point.y - 0, new_point.x - 0) + 1.57;
+      new_point.yaw = atan2(new_point.y - 0, new_point.x - 0);
 
       current_angle += angular_step;
 

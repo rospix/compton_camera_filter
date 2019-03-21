@@ -247,7 +247,7 @@ namespace compton_camera_filter
     Eigen::Vector3d unit(1, 0, 0);
     Eigen::Vector3d dir_to_proj = projection - state_3D;
 
-    if (dir_to_proj.norm() > 15.0) {
+    if (dir_to_proj.norm() > 10.0) {
 
       std::scoped_lock lock(mutex_optimizer);
 
@@ -257,7 +257,7 @@ namespace compton_camera_filter
       lkf_3D->setCovariance(new_cov3);
 
       std_srvs::Trigger search_out;
-      service_client_reset.call(search_out);
+      /* service_client_reset.call(search_out); */
       service_client_search.call(search_out);
 
       kalman_initialized = false;

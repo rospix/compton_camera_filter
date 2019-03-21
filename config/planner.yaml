@@ -7,7 +7,7 @@ tracking:
   trajectory_steps: 40
 
 searching:
-  radius: 20.0
+  radius: 25.0
   speed: 6.0
   height: 4.0
   trajectory_steps: 40

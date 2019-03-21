@@ -20,6 +20,14 @@ from std_srvs.srv import TriggerResponse as TriggerSrvResponse
 
 class ConeFitter:
 
+    # #{ dist3D()
+    
+    def dist3D(self, x, y):
+    
+        return np.linalg.norm(np.array(x) - np.array(y))
+    
+    # #} end of dist3D
+
     # #{ coneDist
     
     def coneDist(self, center, direction, theta):
@@ -191,7 +199,15 @@ class ConeFitter:
         rospy.loginfo_once('[ConeFitter]: getting radiation')
         self.got_cone = True
 
-        self.cones.append(data)
+        too_close = False
+
+        for idx,cone in enumerate(self.cones):
+            if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= 5.0:
+                too_close = True
+                rospy.loginfo('cone too close')
+
+        if not too_close:
+            self.cones.append(data)
 
         if len(self.cones) > self.cone_num:
             self.cones.pop(0)
