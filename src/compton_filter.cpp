@@ -72,6 +72,8 @@ namespace compton_camera_filter
 
     Eigen::MatrixXd initial_covariance_3D_;
 
+    double max_projection_error_;
+
   private:
     // --------------------------------------------------------------
     // |                     dynamic reconfigure                    |
@@ -138,6 +140,8 @@ namespace compton_camera_filter
 
     param_loader.load_param("kalman_3D/r", r_3D_);
     param_loader.load_param("kalman_3D/q", q_3D_);
+
+    param_loader.load_param("kalman_3D/max_projection_error", max_projection_error_);
 
     param_loader.load_matrix_dynamic("kalman_3D/initial_covariance", initial_covariance_3D_, n_states_3D_, n_states_3D_);
 
@@ -245,9 +249,12 @@ namespace compton_camera_filter
     Eigen::Vector3d projection = cone.ProjectPoint(state_3D);
 
     Eigen::Vector3d unit(1, 0, 0);
-    Eigen::Vector3d dir_to_proj = projection - state_3D;
+    Eigen::Vector3d dir_to_proj = projection - cone_position;
 
-    if (dir_to_proj.norm() > 10.0) {
+    // calculate the angular size of the projection distance
+    double proj_ang_size = asin((projection - state_3D).norm() / (projection - cone_position).norm()); 
+
+    if (proj_ang_size > max_projection_error_) {
 
       std::scoped_lock lock(mutex_optimizer);
 

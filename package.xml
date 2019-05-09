@@ -16,6 +16,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <build_depend>message_generation</build_depend> 
   <build_depend>rospy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>nodelet</build_depend>
@@ -28,6 +29,7 @@
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>nodelet</build_export_depend>
   <build_export_depend>message_runtime</build_export_depend>
+  <build_export_depend>message_generation</build_export_depend>
   <build_export_depend>gazebo_rad_msgs</build_export_depend>
   <build_export_depend>mrs_lib</build_export_depend>
 

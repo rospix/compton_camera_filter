@@ -22,11 +22,26 @@ find_package(catkin REQUIRED COMPONENTS
   gazebo_rad_msgs
   mrs_lib
   dynamic_reconfigure
+  message_generation
 )
 
 generate_dynamic_reconfigure_options(
   cfg/compton_filter.cfg
   cfg/trajectory_planner.cfg
+  )
+
+# messages for MPC_TRACKER
+add_message_files(DIRECTORY msg FILES
+
+  Swarm.msg
+  )
+
+## Generate added messages and services with any dependencies listed here
+generate_messages(DEPENDENCIES
+
+  std_msgs
+  geometry_msgs
+  sensor_msgs
   )
 
 catkin_package(

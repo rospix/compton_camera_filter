@@ -60,3 +60,5 @@ kalman_3D:
   P: [1, 0, 0,
       0, 1, 0,
       0, 0, 1]
+
+  max_projection_error: !degrees 20

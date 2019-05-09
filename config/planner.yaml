@@ -1,4 +1,5 @@
 main_timer_rate: 1
+swarm_timer_rate: 1
 
 tracking:
   radius: 20.0
@@ -7,6 +8,11 @@ tracking:
   trajectory_steps: 40
 
 searching:
+
+  initial_position:
+    x: 0
+    y: 0
+
   radius: 25.0
   speed: 6.0
   height: 4.0
