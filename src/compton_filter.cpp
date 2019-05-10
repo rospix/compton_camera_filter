@@ -338,6 +338,8 @@ namespace compton_camera_filter
 
     if (!kalman_initialized) {
 
+      std::scoped_lock lock(mutex_lkf_3D, mutex_lkf_2D);
+
       ROS_INFO("[ComptonFilter]: initializing KF");
 
       Eigen::Vector2d new_state2;
@@ -345,6 +347,7 @@ namespace compton_camera_filter
 
       Eigen::MatrixXd new_cov2 = Eigen::MatrixXd::Zero(n_states_2D_, n_states_2D_);
       new_cov2 << msg->pose.covariance[0], 0, 0, msg->pose.covariance[7];
+      ROS_INFO_STREAM("[ComptonFilter]: new_cov2 = " << new_cov2);
 
       lkf_2D->setStates(new_state2);
       lkf_2D->setCovariance(new_cov2);
@@ -354,6 +357,8 @@ namespace compton_camera_filter
 
       Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
       new_cov3 << msg->pose.covariance[0], 0, 0, 0, msg->pose.covariance[7], 0, 0, 0, msg->pose.covariance[14];
+
+      ROS_INFO_STREAM("[ComptonFilter]: new_cov3 = " << new_cov3);
 
       lkf_3D->setStates(new_state3);
       lkf_3D->setCovariance(new_cov3);

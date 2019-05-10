@@ -339,7 +339,7 @@ bool TrajectoryPlanner::callbackSearch([[maybe_unused]] std_srvs::Trigger::Reque
 
 /* validateHeading() //{ */
 
-double compton_camera_filter::validateHeading(const double yaw_in) {
+double TrajectoryPlanner::validateHeading(const double yaw_in) {
 
   double yaw_out = yaw_in;
 
@@ -354,15 +354,15 @@ double compton_camera_filter::validateHeading(const double yaw_in) {
     ROS_WARN("[validateYawSetpoint]: Desired YAW is > 1000");
   }
   // if desired yaw_out is grater then 2*PI mod it
-  if (fabs(yaw_out) > 2 * PI) {
-    yaw_out = fmod(yaw_out, 2 * PI);
+  if (fabs(yaw_out) > 2 * M_PI) {
+    yaw_out = fmod(yaw_out, 2 * M_PI);
   }
 
   // move it to its place
-  if (yaw_out > PI) {
-    yaw_out -= 2 * PI;
-  } else if (yaw_out < -PI) {
-    yaw_out += 2 * PI;
+  if (yaw_out > M_PI) {
+    yaw_out -= 2 * M_PI;
+  } else if (yaw_out < -M_PI) {
+    yaw_out += 2 * M_PI;
   }
 
   return yaw_out;
@@ -387,7 +387,7 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::trackingTrajectory(void) {
 
     for (std::vector<compton_camera_filter::Swarm>::iterator it = swarm_uavs_list.begin(); it != swarm_uavs_list.end(); it++) {
 
-      double dist = fabs(it->orbit_angle - current_angle);
+      double dist = fabs(validateHeading(it->orbit_angle) - validateHeading(current_angle));
 
       if (dist < closest_dist) {
 
@@ -453,7 +453,7 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::searchingTrajectory(void) {
 
     for (std::vector<compton_camera_filter::Swarm>::iterator it = swarm_uavs_list.begin(); it != swarm_uavs_list.end(); it++) {
 
-      double dist = fabs(it->orbit_angle - current_angle);
+      double dist = fabs(validateHeading(it->orbit_angle) - validateHeading(current_angle));
 
       if (dist < closest_dist) {
 
