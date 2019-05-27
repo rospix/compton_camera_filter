@@ -17,3 +17,4 @@ searching:
   speed: 6.0
   height: 4.0
   trajectory_steps: 40
+  yaw_rate: 0.6

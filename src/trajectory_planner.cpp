@@ -20,6 +20,8 @@
 
 #include <std_srvs/Trigger.h>
 
+#include <tf/transform_datatypes.h>
+
 //}
 
 #define STRING_EQUAL 0
@@ -65,6 +67,9 @@ private:
   nav_msgs::Odometry odometry;
   ros::Subscriber    subscriber_odometry;
   bool               got_odometry = false;
+  double             odometry_yaw;
+  double             odometry_roll;
+  double             odometry_pitch;
 
   geometry_msgs::PoseWithCovarianceStamped optimizer;
 
@@ -103,7 +108,7 @@ private:
   // --------------------------------------------------------------
 
   double     tracking_radius_, tracking_speed_, tracking_height_, tracking_trajectory_steps_;
-  double     searching_radius_, searching_speed_, searching_height_, searching_trajectory_steps_;
+  double     searching_radius_, searching_speed_, searching_height_, searching_trajectory_steps_, searching_yaw_rate_;
   std::mutex mutex_params;
 
   boost::recursive_mutex                                  config_mutex_;
@@ -145,6 +150,7 @@ void TrajectoryPlanner::onInit() {
   param_loader.load_param("searching/radius", searching_radius_);
   param_loader.load_param("searching/speed", searching_speed_);
   param_loader.load_param("searching/height", searching_height_);
+  param_loader.load_param("searching/yaw_rate", searching_yaw_rate_);
   param_loader.load_param("searching/trajectory_steps", searching_trajectory_steps_);
 
   // --------------------------------------------------------------
@@ -243,6 +249,12 @@ void TrajectoryPlanner::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) 
   got_odometry = true;
 
   odometry = *msg;
+
+  // calculate the euler angles
+  tf::Quaternion quaternion_odometry;
+  quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
+  tf::Matrix3x3 m(quaternion_odometry);
+  m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
 }
 
 //}
@@ -480,14 +492,19 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::searchingTrajectory(void) {
   new_trajectory.header.stamp    = ros::Time::now();
   new_trajectory.header.frame_id = "local_origin";
 
+  double current_yaw = odometry_yaw;
+
   for (int i = 0; i < searching_trajectory_steps_; i++) {
 
     mrs_msgs::TrackerPoint new_point;
 
+    current_yaw += searching_yaw_rate_ / 5.0;
+
     new_point.x   = searching_x + searching_radius_ * cos(current_angle);
     new_point.y   = searching_y + searching_radius_ * sin(current_angle);
     new_point.z   = searching_height_;
-    new_point.yaw = atan2(new_point.y - searching_y, new_point.x - searching_x) + M_PI / 2;
+    new_point.yaw = current_yaw;
+    /* new_point.yaw = atan2(new_point.y - searching_y, new_point.x - searching_x); */
 
     current_angle += angular_step;
 
