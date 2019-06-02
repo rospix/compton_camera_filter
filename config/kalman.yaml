@@ -1,5 +1,5 @@
 main_timer_rate: 1.0 # [Hz]
-no_cone_timeout: 10.0
+no_cone_timeout: 60.0
 
 kalman_2D:
   n_states: 2
