@@ -22,6 +22,8 @@
 
 #include <tf/transform_datatypes.h>
 
+#include <dynamic_reconfigure/server.h>
+
 //}
 
 #define STRING_EQUAL 0

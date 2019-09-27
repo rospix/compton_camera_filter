@@ -11,11 +11,13 @@
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Lkf.h>
 
-#include <mrs_lib/GeometryUtils.h>
+#include <mrs_lib/geometry_utils.h>
 
 #include <compton_camera_filter/compton_filterConfig.h>
 
 #include <std_srvs/Trigger.h>
+
+#include <dynamic_reconfigure/server.h>
 
 namespace compton_camera_filter
 {
