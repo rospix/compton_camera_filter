@@ -10,7 +10,6 @@
 
 #include <mrs_lib/ParamLoader.h>
 #include <mrs_lib/Lkf.h>
-
 #include <mrs_lib/geometry_utils.h>
 
 #include <compton_camera_filter/compton_filterConfig.h>
@@ -31,6 +30,8 @@ public:
 private:
   ros::NodeHandle nh_;
   bool            is_initialized = false;
+
+  std::string uav_name_;
 
   ros::Publisher publisher_pose_2D;
   ros::Publisher publisher_pose_3D;
@@ -98,7 +99,7 @@ private:
   std::mutex mutex_drs;
 
 private:
-  mrs_lib::Plane ground_plane;
+  mrs_lib::Plane *ground_plane;
 };
 //}
 
@@ -113,6 +114,8 @@ void ComptonFilter::onInit() {
   ros::Time::waitForValid();
 
   mrs_lib::ParamLoader param_loader(nh_, "ComptonFilter");
+
+  param_loader.load_param("uav_name", uav_name_);
 
   param_loader.load_param("main_timer_rate", main_timer_rate_);
   param_loader.load_param("no_cone_timeout", no_cone_timeout_);
@@ -195,7 +198,7 @@ void ComptonFilter::onInit() {
   Eigen::Vector3d ground_normal;
   ground_normal << 0, 0, 1;
 
-  ground_plane = mrs_lib::Plane(ground_point, ground_normal);
+  /* ground_plane = new mrs_lib::Plane(ground_point, ground_normal); */
 
   // --------------------------------------------------------------
   // |                     dynamic reconfigure                    |
@@ -254,12 +257,12 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
   Eigen::Vector3d cone_direction(msg->direction.x, msg->direction.y, msg->direction.z);
   cone_direction.normalize();
 
-  mrs_lib::Cone cone = mrs_lib::Cone(cone_position, cone_direction, msg->angle);
+  mrs_lib::Cone * cone = new mrs_lib::Cone(cone_position, cone_direction, msg->angle);
 
   // | --------------------------- 3D --------------------------- |
   Eigen::Vector3d state_3D(lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2));
   ROS_INFO_STREAM("[ComptonFilter]: state_3D = " << state_3D);
-  Eigen::Vector3d projection = cone.ProjectPoint(state_3D);
+  Eigen::Vector3d projection = cone->ProjectPoint(state_3D);
   ROS_INFO_STREAM("[ComptonFilter]: projection = " << projection);
   ROS_INFO_STREAM("[ComptonFilter]: cone_position = " << cone_position);
 
@@ -306,7 +309,7 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
   // | --------------------------- 2D --------------------------- |
 
   Eigen::Vector3d state_2D(lkf_2D->getState(0), lkf_2D->getState(1), 0);
-  Eigen::Vector3d projection_2D = cone.ProjectPoint(state_2D);
+  Eigen::Vector3d projection_2D = cone->ProjectPoint(state_2D);
 
   // project it down to the ground
   projection_2D(2) = 0;
@@ -409,7 +412,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     geometry_msgs::PoseWithCovarianceStamped pose_out;
 
     pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = "local_origin";
+    pose_out.header.frame_id      = uav_name_+"/local_origin";
     pose_out.pose.pose.position.x = lkf_2D->getState(0);
     pose_out.pose.pose.position.y = lkf_2D->getState(1);
     pose_out.pose.pose.position.z = 0;
@@ -440,7 +443,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     geometry_msgs::PoseWithCovarianceStamped pose_out;
 
     pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = "local_origin";
+    pose_out.header.frame_id      = uav_name_+"/local_origin";
     pose_out.pose.pose.position.x = lkf_3D->getState(0);
     pose_out.pose.pose.position.y = lkf_3D->getState(1);
     pose_out.pose.pose.position.z = lkf_3D->getState(2);

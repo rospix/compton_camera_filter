@@ -426,7 +426,7 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::trackingTrajectory(void) {
   new_trajectory.fly_now         = true;
   new_trajectory.use_yaw         = true;
   new_trajectory.header.stamp    = ros::Time::now();
-  new_trajectory.header.frame_id = "local_origin";
+  new_trajectory.header.frame_id = "uav1/local_origin";
 
   for (int i = 0; i < tracking_trajectory_steps_; i++) {
 
@@ -438,6 +438,8 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::trackingTrajectory(void) {
     new_point.yaw = atan2(radiation_pose.pose.pose.position.y - new_point.y, radiation_pose.pose.pose.position.x - new_point.x);
 
     current_angle += angular_step;
+
+    ROS_INFO("[TrajectoryPlanner]: current_angle: %.2f", current_angle);
 
     new_trajectory.points.push_back(new_point);
   }
@@ -492,7 +494,7 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::searchingTrajectory(void) {
   new_trajectory.fly_now         = true;
   new_trajectory.use_yaw         = true;
   new_trajectory.header.stamp    = ros::Time::now();
-  new_trajectory.header.frame_id = "local_origin";
+  new_trajectory.header.frame_id = "uav1/local_origin";
 
   double current_yaw = odometry_yaw;
 
