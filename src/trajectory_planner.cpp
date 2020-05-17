@@ -507,8 +507,8 @@ mrs_msgs::TrajectoryReference TrajectoryPlanner::searchingTrajectory(void) {
     new_point.position.x = searching_x + searching_radius_ * cos(current_angle);
     new_point.position.y = searching_y + searching_radius_ * sin(current_angle);
     new_point.position.z = searching_height_;
-    /* new_point.heading    = current_heading; */
-    new_point.heading = atan2(new_point.position.y - searching_y, new_point.position.x - searching_x);
+    new_point.heading    = current_heading;
+    /* new_point.heading = atan2(new_point.position.y - searching_y, new_point.position.x - searching_x); */
 
     current_angle += angular_step;
 

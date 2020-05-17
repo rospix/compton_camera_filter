@@ -276,7 +276,7 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
     std::scoped_lock lock(mutex_optimizer);
 
     Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
-    new_cov3 << optimizer.pose.covariance[0], 0, 0, 0, optimizer.pose.covariance[7], 0, 0, 0, optimizer.pose.covariance[14];
+    new_cov3 << optimizer.pose.covariance[0]+1.0, 0, 0, 0, optimizer.pose.covariance[7]+1.0, 0, 0, 0, optimizer.pose.covariance[14]+1.0;
 
     lkf_3D->setCovariance(new_cov3);
 
@@ -364,7 +364,7 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
     new_state2 << msg->pose.pose.position.x, msg->pose.pose.position.z;
 
     Eigen::MatrixXd new_cov2 = Eigen::MatrixXd::Zero(n_states_2D_, n_states_2D_);
-    new_cov2 << msg->pose.covariance[0], 0, 0, msg->pose.covariance[7];
+    new_cov2 << msg->pose.covariance[0]+1.0, 0, 0, msg->pose.covariance[7]+1.0;
     ROS_INFO_STREAM("[ComptonFilter]: new_cov2 = " << new_cov2);
 
     lkf_2D->setStates(new_state2);
@@ -374,7 +374,7 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
     new_state3 << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 
     Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
-    new_cov3 << msg->pose.covariance[0], 0, 0, 0, msg->pose.covariance[7], 0, 0, 0, msg->pose.covariance[14];
+    new_cov3 << msg->pose.covariance[0]+1.0, 0, 0, 0, msg->pose.covariance[7]+1.0, 0, 0, 0, msg->pose.covariance[14]+1.0;
 
     ROS_INFO_STREAM("[ComptonFilter]: new_cov3 = " << new_cov3);
 

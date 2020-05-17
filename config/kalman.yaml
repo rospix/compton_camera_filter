@@ -47,9 +47,9 @@ kalman_3D:
 
   # process noise
   r: 1.0
-  R: [100.0, 0, 0,
-      0, 100.0, 0,
-      0, 0, 100.0]
+  R: [10.0, 0, 0,
+      0, 10.0, 0,
+      0, 0, 10.0]
 
   # measurement covariance
   q: 5.0
