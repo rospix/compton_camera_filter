@@ -8,8 +8,8 @@
 #include <Eigen/Eigen>
 #include <mutex>
 
-#include <mrs_lib/ParamLoader.h>
-#include <mrs_lib/Lkf.h>
+#include <mrs_lib/param_loader.h>
+#include <mrs_lib/lkf_legacy.h>
 #include <mrs_lib/geometry_utils.h>
 
 #include <compton_camera_filter/compton_filterConfig.h>
@@ -97,9 +97,6 @@ private:
 
   void       dynamicReconfigureCallback(compton_camera_filter::compton_filterConfig &config, uint32_t level);
   std::mutex mutex_drs;
-
-private:
-  mrs_lib::Plane *ground_plane;
 };
 //}
 
@@ -115,44 +112,44 @@ void ComptonFilter::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "ComptonFilter");
 
-  param_loader.load_param("uav_name", uav_name_);
+  param_loader.loadParam("uav_name", uav_name_);
 
-  param_loader.load_param("main_timer_rate", main_timer_rate_);
-  param_loader.load_param("no_cone_timeout", no_cone_timeout_);
+  param_loader.loadParam("main_timer_rate", main_timer_rate_);
+  param_loader.loadParam("no_cone_timeout", no_cone_timeout_);
 
-  param_loader.load_param("kalman_2D/n_states", n_states_2D_);
-  param_loader.load_param("kalman_2D/n_inputs", n_inputs_2D_);
-  param_loader.load_param("kalman_2D/n_measurements", n_measurements_2D_);
+  param_loader.loadParam("kalman_2D/n_states", n_states_2D_);
+  param_loader.loadParam("kalman_2D/n_inputs", n_inputs_2D_);
+  param_loader.loadParam("kalman_2D/n_measurements", n_measurements_2D_);
 
-  param_loader.load_param("kalman_2D/r", r_2D_);
-  param_loader.load_param("kalman_2D/q", q_2D_);
+  param_loader.loadParam("kalman_2D/r", r_2D_);
+  param_loader.loadParam("kalman_2D/q", q_2D_);
 
-  param_loader.load_matrix_dynamic("kalman_2D/A", A_2D_, n_states_2D_, n_states_2D_);
-  param_loader.load_matrix_dynamic("kalman_2D/B", B_2D_, n_states_2D_, n_inputs_2D_);
-  param_loader.load_matrix_dynamic("kalman_2D/R", R_2D_, n_states_2D_, n_states_2D_);
-  param_loader.load_matrix_dynamic("kalman_2D/P", P_2D_, n_measurements_2D_, n_states_2D_);
-  param_loader.load_matrix_dynamic("kalman_2D/Q", Q_2D_, n_measurements_2D_, n_measurements_2D_);
+  param_loader.loadMatrixDynamic("kalman_2D/A", A_2D_, n_states_2D_, n_states_2D_);
+  param_loader.loadMatrixDynamic("kalman_2D/B", B_2D_, n_states_2D_, n_inputs_2D_);
+  param_loader.loadMatrixDynamic("kalman_2D/R", R_2D_, n_states_2D_, n_states_2D_);
+  param_loader.loadMatrixDynamic("kalman_2D/P", P_2D_, n_measurements_2D_, n_states_2D_);
+  param_loader.loadMatrixDynamic("kalman_2D/Q", Q_2D_, n_measurements_2D_, n_measurements_2D_);
 
-  param_loader.load_matrix_dynamic("kalman_2D/initial_covariance", initial_covariance_2D_, n_states_2D_, n_states_2D_);
+  param_loader.loadMatrixDynamic("kalman_2D/initial_covariance", initial_covariance_2D_, n_states_2D_, n_states_2D_);
 
-  param_loader.load_param("kalman_3D/n_states", n_states_3D_);
-  param_loader.load_param("kalman_3D/n_inputs", n_inputs_3D_);
-  param_loader.load_param("kalman_3D/n_measurements", n_measurements_3D_);
+  param_loader.loadParam("kalman_3D/n_states", n_states_3D_);
+  param_loader.loadParam("kalman_3D/n_inputs", n_inputs_3D_);
+  param_loader.loadParam("kalman_3D/n_measurements", n_measurements_3D_);
 
-  param_loader.load_matrix_dynamic("kalman_3D/A", A_3D_, n_states_3D_, n_states_3D_);
-  param_loader.load_matrix_dynamic("kalman_3D/B", B_3D_, n_states_3D_, n_inputs_3D_);
-  param_loader.load_matrix_dynamic("kalman_3D/R", R_3D_, n_states_3D_, n_states_3D_);
-  param_loader.load_matrix_dynamic("kalman_3D/P", P_3D_, n_measurements_3D_, n_states_3D_);
-  param_loader.load_matrix_dynamic("kalman_3D/Q", Q_3D_, n_measurements_3D_, n_measurements_3D_);
+  param_loader.loadMatrixDynamic("kalman_3D/A", A_3D_, n_states_3D_, n_states_3D_);
+  param_loader.loadMatrixDynamic("kalman_3D/B", B_3D_, n_states_3D_, n_inputs_3D_);
+  param_loader.loadMatrixDynamic("kalman_3D/R", R_3D_, n_states_3D_, n_states_3D_);
+  param_loader.loadMatrixDynamic("kalman_3D/P", P_3D_, n_measurements_3D_, n_states_3D_);
+  param_loader.loadMatrixDynamic("kalman_3D/Q", Q_3D_, n_measurements_3D_, n_measurements_3D_);
 
-  param_loader.load_matrix_dynamic("kalman_3D/initial_states", initial_state_3D_, n_states_3D_, 1);
+  param_loader.loadMatrixDynamic("kalman_3D/initial_states", initial_state_3D_, n_states_3D_, 1);
 
-  param_loader.load_param("kalman_3D/r", r_3D_);
-  param_loader.load_param("kalman_3D/q", q_3D_);
+  param_loader.loadParam("kalman_3D/r", r_3D_);
+  param_loader.loadParam("kalman_3D/q", q_3D_);
 
-  param_loader.load_param("kalman_3D/max_projection_error", max_projection_error_);
+  param_loader.loadParam("kalman_3D/max_projection_error", max_projection_error_);
 
-  param_loader.load_matrix_dynamic("kalman_3D/initial_covariance", initial_covariance_3D_, n_states_3D_, n_states_3D_);
+  param_loader.loadMatrixDynamic("kalman_3D/initial_covariance", initial_covariance_3D_, n_states_3D_, n_states_3D_);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -198,8 +195,6 @@ void ComptonFilter::onInit() {
   Eigen::Vector3d ground_normal;
   ground_normal << 0, 0, 1;
 
-  /* ground_plane = new mrs_lib::Plane(ground_point, ground_normal); */
-
   // --------------------------------------------------------------
   // |                     dynamic reconfigure                    |
   // --------------------------------------------------------------
@@ -216,7 +211,7 @@ void ComptonFilter::onInit() {
 
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loaded_successfully()) {
+  if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[ComptonFilter]: Could not load all parameters!");
     ros::shutdown();
   }
@@ -257,12 +252,12 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
   Eigen::Vector3d cone_direction(msg->direction.x, msg->direction.y, msg->direction.z);
   cone_direction.normalize();
 
-  mrs_lib::Cone * cone = new mrs_lib::Cone(cone_position, cone_direction, msg->angle);
+  mrs_lib::Cone *cone = new mrs_lib::Cone(cone_position, msg->angle, 50, cone_direction);
 
   // | --------------------------- 3D --------------------------- |
   Eigen::Vector3d state_3D(lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2));
   ROS_INFO_STREAM("[ComptonFilter]: state_3D = " << state_3D);
-  Eigen::Vector3d projection = cone->ProjectPoint(state_3D);
+  Eigen::Vector3d projection = cone->projectPoint(state_3D);
   ROS_INFO_STREAM("[ComptonFilter]: projection = " << projection);
   ROS_INFO_STREAM("[ComptonFilter]: cone_position = " << cone_position);
 
@@ -309,7 +304,7 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
   // | --------------------------- 2D --------------------------- |
 
   Eigen::Vector3d state_2D(lkf_2D->getState(0), lkf_2D->getState(1), 0);
-  Eigen::Vector3d projection_2D = cone->ProjectPoint(state_2D);
+  Eigen::Vector3d projection_2D = cone->projectPoint(state_2D);
 
   // project it down to the ground
   projection_2D(2) = 0;
@@ -412,7 +407,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     geometry_msgs::PoseWithCovarianceStamped pose_out;
 
     pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = uav_name_+"/local_origin";
+    pose_out.header.frame_id      = uav_name_ + "/gps_origin";
     pose_out.pose.pose.position.x = lkf_2D->getState(0);
     pose_out.pose.pose.position.y = lkf_2D->getState(1);
     pose_out.pose.pose.position.z = 0;
@@ -443,7 +438,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     geometry_msgs::PoseWithCovarianceStamped pose_out;
 
     pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = uav_name_+"/local_origin";
+    pose_out.header.frame_id      = uav_name_ + "/gps_origin";
     pose_out.pose.pose.position.x = lkf_3D->getState(0);
     pose_out.pose.pose.position.y = lkf_3D->getState(1);
     pose_out.pose.pose.position.z = lkf_3D->getState(2);

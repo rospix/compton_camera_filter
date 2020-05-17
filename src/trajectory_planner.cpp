@@ -8,12 +8,12 @@
 #include <Eigen/Eigen>
 #include <mutex>
 
-#include <mrs_lib/ParamLoader.h>
+#include <mrs_lib/param_loader.h>
 
 #include <compton_camera_filter/trajectory_plannerConfig.h>
 
-#include <mrs_msgs/TrackerTrajectory.h>
-#include <mrs_msgs/TrackerPoint.h>
+#include <mrs_msgs/TrajectoryReference.h>
+#include <mrs_msgs/Reference.h>
 #include <compton_camera_filter/Swarm.h>
 
 #include <nav_msgs/Odometry.h>
@@ -45,7 +45,7 @@ private:
   ros::Publisher publisher_trajectory;
   ros::Publisher publisher_swarm_control;
 
-  double validateHeading(const double yaw_in);
+  double validateHeading(const double heading_in);
 
 private:
   ros::Subscriber subscriber_pose;
@@ -69,7 +69,7 @@ private:
   nav_msgs::Odometry odometry;
   ros::Subscriber    subscriber_odometry;
   bool               got_odometry = false;
-  double             odometry_yaw;
+  double             odometry_heading;
   double             odometry_roll;
   double             odometry_pitch;
 
@@ -95,8 +95,8 @@ private:
   void       swarmTimer(const ros::TimerEvent &event);
 
 private:
-  mrs_msgs::TrackerTrajectory trackingTrajectory(void);
-  mrs_msgs::TrackerTrajectory searchingTrajectory(void);
+  mrs_msgs::TrajectoryReference trackingTrajectory(void);
+  mrs_msgs::TrajectoryReference searchingTrajectory(void);
 
 private:
   double searching_x, searching_y;
@@ -110,7 +110,7 @@ private:
   // --------------------------------------------------------------
 
   double     tracking_radius_, tracking_speed_, tracking_height_, tracking_trajectory_steps_;
-  double     searching_radius_, searching_speed_, searching_height_, searching_trajectory_steps_, searching_yaw_rate_;
+  double     searching_radius_, searching_speed_, searching_height_, searching_trajectory_steps_, searching_heading_rate_;
   std::mutex mutex_params;
 
   boost::recursive_mutex                                  config_mutex_;
@@ -137,23 +137,23 @@ void TrajectoryPlanner::onInit() {
 
   mrs_lib::ParamLoader param_loader(nh_, "TrajectoryPlanner");
 
-  param_loader.load_param("uav_name", uav_name_);
+  param_loader.loadParam("uav_name", uav_name_);
 
-  param_loader.load_param("main_timer_rate", main_timer_rate_);
-  param_loader.load_param("swarm_timer_rate", swarm_timer_rate);
+  param_loader.loadParam("main_timer_rate", main_timer_rate_);
+  param_loader.loadParam("swarm_timer_rate", swarm_timer_rate);
 
-  param_loader.load_param("tracking/radius", tracking_radius_);
-  param_loader.load_param("tracking/speed", tracking_speed_);
-  param_loader.load_param("tracking/height", tracking_height_);
-  param_loader.load_param("tracking/trajectory_steps", tracking_trajectory_steps_);
+  param_loader.loadParam("tracking/radius", tracking_radius_);
+  param_loader.loadParam("tracking/speed", tracking_speed_);
+  param_loader.loadParam("tracking/height", tracking_height_);
+  param_loader.loadParam("tracking/trajectory_steps", tracking_trajectory_steps_);
 
-  param_loader.load_param("searching/initial_position/x", searching_x);
-  param_loader.load_param("searching/initial_position/y", searching_y);
-  param_loader.load_param("searching/radius", searching_radius_);
-  param_loader.load_param("searching/speed", searching_speed_);
-  param_loader.load_param("searching/height", searching_height_);
-  param_loader.load_param("searching/yaw_rate", searching_yaw_rate_);
-  param_loader.load_param("searching/trajectory_steps", searching_trajectory_steps_);
+  param_loader.loadParam("searching/initial_position/x", searching_x);
+  param_loader.loadParam("searching/initial_position/y", searching_y);
+  param_loader.loadParam("searching/radius", searching_radius_);
+  param_loader.loadParam("searching/speed", searching_speed_);
+  param_loader.loadParam("searching/height", searching_height_);
+  param_loader.loadParam("searching/heading_rate", searching_heading_rate_);
+  param_loader.loadParam("searching/trajectory_steps", searching_trajectory_steps_);
 
   // --------------------------------------------------------------
   // |                         subscribers                        |
@@ -168,7 +168,7 @@ void TrajectoryPlanner::onInit() {
   // |                         publishers                         |
   // --------------------------------------------------------------
 
-  publisher_trajectory    = nh_.advertise<mrs_msgs::TrackerTrajectory>("trajectory_out", 1);
+  publisher_trajectory    = nh_.advertise<mrs_msgs::TrajectoryReference>("trajectory_out", 1);
   publisher_swarm_control = nh_.advertise<compton_camera_filter::Swarm>("swarm_out", 1);
 
   // --------------------------------------------------------------
@@ -203,7 +203,7 @@ void TrajectoryPlanner::onInit() {
 
   // | ----------------------- finish init ---------------------- |
 
-  if (!param_loader.loaded_successfully()) {
+  if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[TrajectoryPlanner]: Could not load all parameters!");
     ros::shutdown();
   }
@@ -256,7 +256,7 @@ void TrajectoryPlanner::callbackOdometry(const nav_msgs::OdometryConstPtr &msg) 
   tf::Quaternion quaternion_odometry;
   quaternionMsgToTF(odometry.pose.pose.orientation, quaternion_odometry);
   tf::Matrix3x3 m(quaternion_odometry);
-  m.getRPY(odometry_roll, odometry_pitch, odometry_yaw);
+  m.getRPY(odometry_roll, odometry_pitch, odometry_heading);
 }
 
 //}
@@ -353,40 +353,40 @@ bool TrajectoryPlanner::callbackSearch([[maybe_unused]] std_srvs::Trigger::Reque
 
 /* validateHeading() //{ */
 
-double TrajectoryPlanner::validateHeading(const double yaw_in) {
+double TrajectoryPlanner::validateHeading(const double heading_in) {
 
-  double yaw_out = yaw_in;
+  double heading_out = heading_in;
 
-  if (!std::isfinite(yaw_out)) {
+  if (!std::isfinite(heading_out)) {
 
-    yaw_out = 0;
-    ROS_ERROR("[validateYawSetpoint]: Desired YAW is not finite number!");
+    heading_out = 0;
+    ROS_ERROR("[validateheadingSetpoint]: Desired heading is not finite number!");
   }
 
-  if (fabs(yaw_out) > 1000) {
+  if (fabs(heading_out) > 1000) {
 
-    ROS_WARN("[validateYawSetpoint]: Desired YAW is > 1000");
+    ROS_WARN("[validateheadingSetpoint]: Desired heading is > 1000");
   }
-  // if desired yaw_out is grater then 2*PI mod it
-  if (fabs(yaw_out) > 2 * M_PI) {
-    yaw_out = fmod(yaw_out, 2 * M_PI);
+  // if desired heading_out is grater then 2*PI mod it
+  if (fabs(heading_out) > 2 * M_PI) {
+    heading_out = fmod(heading_out, 2 * M_PI);
   }
 
   // move it to its place
-  if (yaw_out > M_PI) {
-    yaw_out -= 2 * M_PI;
-  } else if (yaw_out < -M_PI) {
-    yaw_out += 2 * M_PI;
+  if (heading_out > M_PI) {
+    heading_out -= 2 * M_PI;
+  } else if (heading_out < -M_PI) {
+    heading_out += 2 * M_PI;
   }
 
-  return yaw_out;
+  return heading_out;
 }
 
 //}
 
 /* trackingTrajectory() //{ */
 
-mrs_msgs::TrackerTrajectory TrajectoryPlanner::trackingTrajectory(void) {
+mrs_msgs::TrajectoryReference TrajectoryPlanner::trackingTrajectory(void) {
 
   // get current angle
   double current_angle =
@@ -421,21 +421,21 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::trackingTrajectory(void) {
   std::scoped_lock lock(mutex_radiation_pose, mutex_odometry);
 
   // create the trajectory
-  mrs_msgs::TrackerTrajectory new_trajectory;
+  mrs_msgs::TrajectoryReference new_trajectory;
 
   new_trajectory.fly_now         = true;
-  new_trajectory.use_yaw         = true;
+  new_trajectory.use_heading     = true;
   new_trajectory.header.stamp    = ros::Time::now();
-  new_trajectory.header.frame_id = "uav1/local_origin";
+  new_trajectory.header.frame_id = "gps_origin";
 
   for (int i = 0; i < tracking_trajectory_steps_; i++) {
 
-    mrs_msgs::TrackerPoint new_point;
+    mrs_msgs::Reference new_point;
 
-    new_point.x   = radiation_pose.pose.pose.position.x + tracking_radius_ * cos(current_angle);
-    new_point.y   = radiation_pose.pose.pose.position.y + tracking_radius_ * sin(current_angle);
-    new_point.z   = tracking_height_;
-    new_point.yaw = atan2(radiation_pose.pose.pose.position.y - new_point.y, radiation_pose.pose.pose.position.x - new_point.x);
+    new_point.position.x = radiation_pose.pose.pose.position.x + tracking_radius_ * cos(current_angle);
+    new_point.position.y = radiation_pose.pose.pose.position.y + tracking_radius_ * sin(current_angle);
+    new_point.position.z = tracking_height_;
+    new_point.heading    = atan2(radiation_pose.pose.pose.position.y - new_point.position.y, radiation_pose.pose.pose.position.x - new_point.position.x);
 
     current_angle += angular_step;
 
@@ -455,7 +455,7 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::trackingTrajectory(void) {
 
 /* searchingTrajectory() //{ */
 
-mrs_msgs::TrackerTrajectory TrajectoryPlanner::searchingTrajectory(void) {
+mrs_msgs::TrajectoryReference TrajectoryPlanner::searchingTrajectory(void) {
 
   // get current angle
   double current_angle = atan2(odometry.pose.pose.position.y - searching_y, odometry.pose.pose.position.x - searching_x);
@@ -489,26 +489,26 @@ mrs_msgs::TrackerTrajectory TrajectoryPlanner::searchingTrajectory(void) {
   std::scoped_lock lock(mutex_odometry);
 
   // create the trajectory
-  mrs_msgs::TrackerTrajectory new_trajectory;
+  mrs_msgs::TrajectoryReference new_trajectory;
 
   new_trajectory.fly_now         = true;
-  new_trajectory.use_yaw         = true;
+  new_trajectory.use_heading     = true;
   new_trajectory.header.stamp    = ros::Time::now();
-  new_trajectory.header.frame_id = "uav1/local_origin";
+  new_trajectory.header.frame_id = "gps_origin";
 
-  double current_yaw = odometry_yaw;
+  double current_heading = odometry_heading;
 
   for (int i = 0; i < searching_trajectory_steps_; i++) {
 
-    mrs_msgs::TrackerPoint new_point;
+    mrs_msgs::Reference new_point;
 
-    current_yaw += searching_yaw_rate_ / 5.0;
+    current_heading += searching_heading_rate_ / 5.0;
 
-    new_point.x   = searching_x + searching_radius_ * cos(current_angle);
-    new_point.y   = searching_y + searching_radius_ * sin(current_angle);
-    new_point.z   = searching_height_;
-    new_point.yaw = current_yaw;
-    /* new_point.yaw = atan2(new_point.y - searching_y, new_point.x - searching_x); */
+    new_point.position.x = searching_x + searching_radius_ * cos(current_angle);
+    new_point.position.y = searching_y + searching_radius_ * sin(current_angle);
+    new_point.position.z = searching_height_;
+    /* new_point.heading    = current_heading; */
+    new_point.heading = atan2(new_point.position.y - searching_y, new_point.position.x - searching_x);
 
     current_angle += angular_step;
 
@@ -536,7 +536,7 @@ void TrajectoryPlanner::mainTimer([[maybe_unused]] const ros::TimerEvent &event)
     return;
   }
 
-  mrs_msgs::TrackerTrajectory new_trajectory;
+  mrs_msgs::TrajectoryReference new_trajectory;
 
   if (got_pose) {
 

@@ -331,7 +331,7 @@ class ConeFitter:
         rospy.loginfo('Optimized for {} cones, max distance {}: total time {}, initialization {}, jacobian {}, lamdification {}, optimization {}'.format(len(self.cones), max_distance, (time_after_optimization - time_start).to_sec(), (time_before_J - time_start).to_sec(), (time_before_lamdification - time_before_J).to_sec(), (time_before_optimization - time_before_lamdification).to_sec(), (time_after_optimization - time_before_optimization).to_sec()))
 
         msg_out = PoseWithCovarianceStampedMsg()
-        msg_out.header.frame_id = self.uav_name_+"/local_origin"
+        msg_out.header.frame_id = self.uav_name_+"/gps_origin"
         msg_out.header.stamp = rospy.Time.now()
         msg_out.pose.pose.position.x = res.x[0]
         msg_out.pose.pose.position.y = res.x[1]

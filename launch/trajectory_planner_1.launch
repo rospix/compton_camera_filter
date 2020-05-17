@@ -17,7 +17,7 @@
       <remap from="~swarm_in" to="/swarm_control" />
 
       <!-- advertised topics -->
-      <remap from="~trajectory_out" to="control_manager/mpc_tracker/set_trajectory" />
+      <remap from="~trajectory_out" to="control_manager/trajectory_reference" />
       <remap from="~swarm_out" to="/swarm_control" />
 
       <!-- services -->
