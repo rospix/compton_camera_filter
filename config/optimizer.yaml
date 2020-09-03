@@ -1,2 +1,4 @@
 cone_num: 5
 constraint_offset: 0.0 # does not work (and does not make sense)
+
+cone_min_dist: 0.5 # [m]

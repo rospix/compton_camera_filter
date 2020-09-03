@@ -9,7 +9,7 @@ import scipy as sc
 import scipy.optimize as op
 import time
 
-from gazebo_rad_msgs.msg import Cone as ConeMsg
+from rad_msgs.msg import Cone as ConeMsg
 from geometry_msgs.msg import PoseWithCovarianceStamped as PoseWithCovarianceStampedMsg
 
 from std_srvs.srv import SetBool as SetBoolSrv
@@ -159,6 +159,7 @@ class ConeFitter:
 
         self.cone_num = rospy.get_param('~cone_num')
         self.constraint_offset = rospy.get_param('~constraint_offset')
+        self._cone_min_dist_ = rospy.get_param('~cone_min_dist')
 
         # subscribers
         rospy.Subscriber("~cone_in", ConeMsg, self.callbackCone, queue_size=1)
@@ -198,13 +199,13 @@ class ConeFitter:
         if not self.is_initialized:
             return 
 
-        rospy.loginfo_once('[ConeFitter]: getting radiation')
+        rospy.loginfo_once('[ConeFitter]: getting cones')
         self.got_cone = True
 
         too_close = False
 
         for idx,cone in enumerate(self.cones):
-            if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= 5.0:
+            if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= self._cone_min_dist_:
                 too_close = True
                 rospy.loginfo('cone too close')
 
@@ -331,7 +332,7 @@ class ConeFitter:
         rospy.loginfo('Optimized for {} cones, max distance {}: total time {}, initialization {}, jacobian {}, lamdification {}, optimization {}'.format(len(self.cones), max_distance, (time_after_optimization - time_start).to_sec(), (time_before_J - time_start).to_sec(), (time_before_lamdification - time_before_J).to_sec(), (time_before_optimization - time_before_lamdification).to_sec(), (time_after_optimization - time_before_optimization).to_sec()))
 
         msg_out = PoseWithCovarianceStampedMsg()
-        msg_out.header.frame_id = self.uav_name_+"/gps_origin"
+        msg_out.header.frame_id = self.cones[0].header.frame_id
         msg_out.header.stamp = rospy.Time.now()
         msg_out.pose.pose.position.x = res.x[0]
         msg_out.pose.pose.position.y = res.x[1]

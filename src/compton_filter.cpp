@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <nodelet/nodelet.h>
 
-#include <gazebo_rad_msgs/Cone.h>
+#include <rad_msgs/Cone.h>
 
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
@@ -32,6 +32,7 @@ private:
   bool            is_initialized = false;
 
   std::string uav_name_;
+  std::string _world_frame_;
 
   ros::Publisher publisher_pose_2D;
   ros::Publisher publisher_pose_3D;
@@ -41,7 +42,7 @@ private:
 
 private:
   ros::Subscriber subscriber_cone;
-  void            callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg);
+  void            callbackCone(const rad_msgs::ConeConstPtr &msg);
   ros::Time       cone_last_time;
   std::mutex      mutex_cone_last_time;
   double          no_cone_timeout_;
@@ -56,7 +57,7 @@ private:
 
 private:
   ros::Timer main_timer;
-  int        main_timer_rate_;
+  double     main_timer_rate_;
   void       mainTimer(const ros::TimerEvent &event);
 
 private:
@@ -113,6 +114,7 @@ void ComptonFilter::onInit() {
   mrs_lib::ParamLoader param_loader(nh_, "ComptonFilter");
 
   param_loader.loadParam("uav_name", uav_name_);
+  param_loader.loadParam("world_frame", _world_frame_);
 
   param_loader.loadParam("main_timer_rate", main_timer_rate_);
   param_loader.loadParam("no_cone_timeout", no_cone_timeout_);
@@ -229,7 +231,7 @@ void ComptonFilter::onInit() {
 
 /* callbackCone() //{ */
 
-void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
+void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr &msg) {
 
   if (!is_initialized)
     return;
@@ -238,7 +240,7 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
     return;
   }
 
-  ROS_INFO_ONCE("[ComptonFilter]: getting cones");
+  ROS_INFO("[ComptonFilter]: cone received");
 
   {
     std::scoped_lock lock(mutex_cone_last_time);
@@ -252,90 +254,110 @@ void ComptonFilter::callbackCone(const gazebo_rad_msgs::ConeConstPtr &msg) {
   Eigen::Vector3d cone_direction(msg->direction.x, msg->direction.y, msg->direction.z);
   cone_direction.normalize();
 
-  mrs_lib::Cone *cone = new mrs_lib::Cone(cone_position, msg->angle, 50, cone_direction);
+  mrs_lib::Cone cone = mrs_lib::Cone(cone_position, msg->angle, 50, cone_direction);
 
   // | --------------------------- 3D --------------------------- |
   Eigen::Vector3d state_3D(lkf_3D->getState(0), lkf_3D->getState(1), lkf_3D->getState(2));
   ROS_INFO_STREAM("[ComptonFilter]: state_3D = " << state_3D);
-  Eigen::Vector3d projection = cone->projectPoint(state_3D);
-  ROS_INFO_STREAM("[ComptonFilter]: projection = " << projection);
-  ROS_INFO_STREAM("[ComptonFilter]: cone_position = " << cone_position);
 
-  Eigen::Vector3d unit(1, 0, 0);
-  /* Eigen::Vector3d dir_to_proj = projection - cone_position; */
-  Eigen::Vector3d dir_to_proj = projection - state_3D;
-  ROS_INFO_STREAM("[ComptonFilter]: dir_to_proj = " << dir_to_proj);
+  auto            result3d = cone.projectPoint(state_3D);
+  Eigen::Vector3d projection;
 
-  // calculate the angular size of the projection distance
-  double proj_ang_size = asin((projection - state_3D).norm() / (projection - cone_position).norm());
+  Eigen::Vector3d e1(1, 0, 0);
 
-  if (proj_ang_size > max_projection_error_) {
+  if (result3d) {
 
-    ROS_INFO("[ComptonFilter]: angular error too large, reinitializing");
+    projection = result3d.value();
 
-    std::scoped_lock lock(mutex_optimizer);
+    ROS_INFO_STREAM("[ComptonFilter]: projection = " << projection);
+    ROS_INFO_STREAM("[ComptonFilter]: cone_position = " << cone_position);
 
-    Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
-    new_cov3 << optimizer.pose.covariance[0]+1.0, 0, 0, 0, optimizer.pose.covariance[7]+1.0, 0, 0, 0, optimizer.pose.covariance[14]+1.0;
+    /* Eigen::Vector3d dir_to_proj = projection - cone_position; */
+    Eigen::Vector3d dir_to_proj = projection - state_3D;
+    ROS_INFO_STREAM("[ComptonFilter]: dir_to_proj = " << dir_to_proj);
 
-    lkf_3D->setCovariance(new_cov3);
+    // calculate the angular size of the projection distance
+    double proj_ang_size = mrs_lib::vectorAngle(Eigen::Vector3d(state_3D - cone_position), Eigen::Vector3d(projection - cone_position));
 
-    std_srvs::Trigger search_out;
-    /* service_client_reset.call(search_out); */
-    service_client_search.call(search_out);
+    ROS_INFO("[ComptonFilter]: proj_ang_size %.2f deg", (proj_ang_size / M_PI) * 180.0);
 
-    ROS_INFO("[ComptonFilter]: calling service for searching");
+    if (fabs(proj_ang_size) > max_projection_error_) {
 
-    kalman_initialized = false;
+      ROS_INFO("[ComptonFilter]: angular error too large, reinitializing");
+
+      return;
+
+      /* std::scoped_lock lock(mutex_optimizer); */
+
+      /* Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_); */
+      /* new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0; */
+
+      /* lkf_3D->setCovariance(new_cov3); */
+
+      /* std_srvs::Trigger search_out; */
+      /* /1* service_client_reset.call(search_out); *1/ */
+      /* service_client_search.call(search_out); */
+
+      /* ROS_INFO("[ComptonFilter]: calling service for searching"); */
+
+      /* kalman_initialized = false; */
+    }
+
+    // construct the covariance rotation
+    double                   angle = acos((dir_to_proj.dot(e1)) / (dir_to_proj.norm() * e1.norm()));
+    Eigen::Vector3d          axis  = e1.cross(dir_to_proj);
+    Eigen::AngleAxis<double> my_quat(angle, axis);
+    Eigen::Matrix3d          rot = my_quat.toRotationMatrix();
+
+    // rotate the covariance
+    Eigen::Matrix3d rot_cov = rot * Q_3D_ * rot.transpose();
+
+    lkf_3D->setMeasurement(projection, rot_cov);
+    lkf_3D->doCorrection();
   }
-
-  // construct the covariance rotation
-  double                   angle = acos((dir_to_proj.dot(unit)) / (dir_to_proj.norm() * unit.norm()));
-  Eigen::Vector3d          axis  = unit.cross(dir_to_proj);
-  Eigen::AngleAxis<double> my_quat(angle, axis);
-  Eigen::Matrix3d          rot = my_quat.toRotationMatrix();
-
-  // rotate the covariance
-  Eigen::Matrix3d rot_cov = rot * Q_3D_ * rot.transpose();
-
-  lkf_3D->setMeasurement(projection, rot_cov);
-  lkf_3D->iterate();
 
   // | --------------------------- 2D --------------------------- |
 
   Eigen::Vector3d state_2D(lkf_2D->getState(0), lkf_2D->getState(1), 0);
-  Eigen::Vector3d projection_2D = cone->projectPoint(state_2D);
+  auto            result2d = cone.projectPoint(state_2D);
 
-  // project it down to the ground
-  projection_2D(2) = 0;
+  Eigen::Vector3d projection_2D;
 
-  dir_to_proj = projection_2D - state_2D;
+  if (result2d) {
 
-  // construct the covariance rotation
-  angle = acos((dir_to_proj.dot(unit)) / (dir_to_proj.norm() * unit.norm()));
-  axis  = unit.cross(dir_to_proj);
-  Eigen::AngleAxis<double> my_quat2(angle, axis);
-  rot = my_quat2.toRotationMatrix();
+    projection_2D = result2d.value();
 
-  // rotate the covariance
-  Eigen::Matrix3d Q_2D_in_3D   = Eigen::MatrixXd::Zero(3, 3);
-  Q_2D_in_3D.block(0, 0, 2, 2) = Q_2D_;
-  Q_2D_in_3D(2, 2)             = Q_2D_in_3D(1, 1);
+    // project it down to the ground
+    projection_2D(2) = 0;
 
-  ROS_INFO_STREAM("[ComptonFilter]: Q_2D_in_3D:" << Q_2D_in_3D);
-  rot_cov                = rot * Q_2D_in_3D * rot.transpose();
-  Eigen::Matrix2d cov_2D = rot_cov.block(0, 0, 2, 2);
+    Eigen::Vector3d dir_to_proj = projection_2D - state_2D;
 
-  /* cov_2D << q_2D_, 0, */
-  /*           0, q_2D_; */
+    // construct the covariance rotation
+    double                   angle = acos((dir_to_proj.dot(e1)) / (dir_to_proj.norm() * e1.norm()));
+    Eigen::Vector3d          axis  = e1.cross(dir_to_proj);
+    Eigen::AngleAxis<double> my_quat2(angle, axis);
+    Eigen::Matrix3d          rot = my_quat2.toRotationMatrix();
 
-  Eigen::Vector2d measurement(projection_2D(0), projection_2D(1));
+    // rotate the covariance
+    Eigen::Matrix3d Q_2D_in_3D   = Eigen::MatrixXd::Zero(3, 3);
+    Q_2D_in_3D.block(0, 0, 2, 2) = Q_2D_;
+    Q_2D_in_3D(2, 2)             = Q_2D_in_3D(1, 1);
 
-  ROS_INFO("[ComptonFilter]: state %f %f", state_2D(0), state_2D(1));
-  ROS_INFO("[ComptonFilter]: measurement %f %f", measurement(0), measurement(1));
+    /* ROS_INFO_STREAM("[ComptonFilter]: Q_2D_in_3D:" << Q_2D_in_3D); */
+    Eigen::Matrix3d rot_cov = rot * Q_2D_in_3D * rot.transpose();
+    Eigen::Matrix2d cov_2D  = rot_cov.block(0, 0, 2, 2);
 
-  lkf_2D->setMeasurement(measurement, cov_2D);
-  lkf_2D->iterate();
+    /* cov_2D << q_2D_, 0, */
+    /*           0, q_2D_; */
+
+    Eigen::Vector2d measurement(projection_2D(0), projection_2D(1));
+
+    /* ROS_INFO("[ComptonFilter]: state %f %f", state_2D(0), state_2D(1)); */
+    /* ROS_INFO("[ComptonFilter]: measurement %f %f", measurement(0), measurement(1)); */
+
+    lkf_2D->setMeasurement(measurement, cov_2D);
+    lkf_2D->doCorrection();
+  }
 }
 
 //}
@@ -364,7 +386,7 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
     new_state2 << msg->pose.pose.position.x, msg->pose.pose.position.z;
 
     Eigen::MatrixXd new_cov2 = Eigen::MatrixXd::Zero(n_states_2D_, n_states_2D_);
-    new_cov2 << msg->pose.covariance[0]+1.0, 0, 0, msg->pose.covariance[7]+1.0;
+    new_cov2 << msg->pose.covariance[0] + 1.0, 0, 0, msg->pose.covariance[7] + 1.0;
     ROS_INFO_STREAM("[ComptonFilter]: new_cov2 = " << new_cov2);
 
     lkf_2D->setStates(new_state2);
@@ -374,7 +396,7 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
     new_state3 << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
 
     Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(n_states_3D_, n_states_3D_);
-    new_cov3 << msg->pose.covariance[0]+1.0, 0, 0, 0, msg->pose.covariance[7]+1.0, 0, 0, 0, msg->pose.covariance[14]+1.0;
+    new_cov3 << msg->pose.covariance[0] + 1.0, 0, 0, 0, msg->pose.covariance[7] + 1.0, 0, 0, 0, msg->pose.covariance[14] + 1.0;
 
     ROS_INFO_STREAM("[ComptonFilter]: new_cov3 = " << new_cov3);
 
@@ -398,6 +420,18 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     return;
   }
 
+  {
+    std::scoped_lock lock(mutex_lkf_2D);
+
+    lkf_2D->iterateWithoutCorrection();
+  }
+
+  {
+    std::scoped_lock lock(mutex_lkf_3D);
+
+    lkf_3D->iterateWithoutCorrection();
+  }
+
   // | ------------------------ 2D kalman ----------------------- |
 
   {
@@ -407,7 +441,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     geometry_msgs::PoseWithCovarianceStamped pose_out;
 
     pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = uav_name_ + "/gps_origin";
+    pose_out.header.frame_id      = _world_frame_;
     pose_out.pose.pose.position.x = lkf_2D->getState(0);
     pose_out.pose.pose.position.y = lkf_2D->getState(1);
     pose_out.pose.pose.position.z = 0;
@@ -438,7 +472,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     geometry_msgs::PoseWithCovarianceStamped pose_out;
 
     pose_out.header.stamp         = ros::Time::now();
-    pose_out.header.frame_id      = uav_name_ + "/gps_origin";
+    pose_out.header.frame_id      = _world_frame_;
     pose_out.pose.pose.position.x = lkf_3D->getState(0);
     pose_out.pose.pose.position.y = lkf_3D->getState(1);
     pose_out.pose.pose.position.z = lkf_3D->getState(2);
@@ -463,21 +497,21 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent &event) {
     }
   }
 
-  {
-    std::scoped_lock lock(mutex_cone_last_time);
+  /* { */
+  /*   std::scoped_lock lock(mutex_cone_last_time); */
 
-    if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) {
+  /*   if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) { */
 
-      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s", no_cone_timeout_);
+  /*     ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s", no_cone_timeout_); */
 
-      std_srvs::Trigger search_out;
-      service_client_search.call(search_out);
+  /*     std_srvs::Trigger search_out; */
+  /*     service_client_search.call(search_out); */
 
-      ROS_INFO("[ComptonFilter]: calling service for searching");
+  /*     ROS_INFO("[ComptonFilter]: calling service for searching"); */
 
-      kalman_initialized = false;
-    }
-  }
+  /*     kalman_initialized = false; */
+  /*   } */
+  /* } */
 }
 
 //}
