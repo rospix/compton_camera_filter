@@ -5,9 +5,14 @@
   <arg name="world_frame" default="$(arg uav_name)/stable_origin" />
   <!-- <arg name="world_frame" default="$(arg uav_name)/hector_origin" /> -->
 
+  <arg name="debug" default="false" />
+
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+
   <group ns="$(arg uav_name)">
 
-    <node name="compton_filter" pkg="nodelet" type="nodelet" args="standalone compton_camera_filter/ComptonFilter" output="screen">
+    <node name="compton_filter" pkg="nodelet" type="nodelet" args="standalone compton_camera_filter/ComptonFilter" output="screen" launch-prefix="$(arg launch_prefix)">
 
       <rosparam file="$(find compton_camera_filter)/config/kalman.yaml" command="load" />
 
@@ -21,6 +26,8 @@
       <!-- advertised topics -->
       <remap from="~pose_2D_out" to="~pose_2D" />
       <remap from="~pose_3D_out" to="~pose_3D" />
+      <remap from="~correction_2d_out" to="~correction_2d" />
+      <remap from="~correction_3d_out" to="~correction_3d" />
 
       <!-- services -->
       <remap from="~search_out" to="trajectory_planner/search" />
