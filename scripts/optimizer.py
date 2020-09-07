@@ -71,6 +71,12 @@ class ConeFitter:
             direction = dd[idx]
     
             cons.append({'type': 'ineq', 'fun': lambda x: +(direction[0]*(x[0]+direction[0]*self.constraint_offset) + direction[1]*(x[1]+direction[1]*self.constraint_offset) + direction[2]*(x[2]+direction[2]*self.constraint_offset) - (direction[0]*center[0] + direction[1]*center[1] + direction[2]*center[2]))})
+
+            if self._min_dist_enabled_:
+              cons.append({'type': 'ineq', 'fun': lambda x: +(m.pow(center[0] - x[0], 2) + m.pow(center[1] - x[1], 2) + m.pow(center[1] - x[1], 2) - m.pow(self._min_dist_distance_, 2.0))})
+
+        if self._fixed_camera_enabled_:
+          cons.append({'type': 'eq', 'fun': lambda x: +(x[0]*x[0] + x[1]*x[1] + x[2]*x[2] - self._fixed_camera_distance_)})
     
         return cons
     
@@ -160,6 +166,13 @@ class ConeFitter:
         self.cone_num = rospy.get_param('~cone_num')
         self.constraint_offset = rospy.get_param('~constraint_offset')
         self._cone_min_dist_ = rospy.get_param('~cone_min_dist')
+        self._fixed_camera_enabled_ = rospy.get_param('~fixed_camera/enabled')
+        self._fixed_camera_distance_ = rospy.get_param('~fixed_camera/distance')
+        self._exclude_origin_enabled_ = rospy.get_param('~exclude_origin/enabled')
+        self._exclude_origin_distance_ = rospy.get_param('~exclude_origin/distance')
+
+        self._min_dist_enabled_ = rospy.get_param('~min_dist/enabled')
+        self._min_dist_distance_ = rospy.get_param('~min_dist/distance')
 
         # subscribers
         rospy.Subscriber("~cone_in", ConeMsg, self.callbackCone, queue_size=1)
@@ -204,10 +217,16 @@ class ConeFitter:
 
         too_close = False
 
-        for idx,cone in enumerate(self.cones):
-            if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= self._cone_min_dist_:
+        if not self._fixed_camera_enabled_:
+            for idx,cone in enumerate(self.cones):
+                if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= self._cone_min_dist_:
+                    too_close = True
+                    rospy.loginfo('cone too close')
+
+        if self._exclude_origin_enabled_:
+            if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [0, 0, 0]) <= self._exclude_origin_distance_:
                 too_close = True
-                rospy.loginfo('cone too close')
+                rospy.loginfo('cone too close to origin')
 
         if not too_close:
             self.cones.append(data)

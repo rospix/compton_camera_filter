@@ -2,3 +2,16 @@ cone_num: 5
 constraint_offset: 0.0 # does not work (and does not make sense)
 
 cone_min_dist: 0.5 # [m]
+
+fixed_camera:
+  enabled: false
+  distance: 0.5 # [m]
+
+
+min_dist: # min distance of a solution to each cone center
+  enabled: true
+  distance: 0.5 # [m]
+
+exclude_origin:
+  enabled: true
+  distance: 1.5 # [m]
