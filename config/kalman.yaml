@@ -14,7 +14,7 @@ kalman_2D:
       0, 1.0]
 
   # measurement covariance
-  r: 1.0
+  r: 5.0
   R: [1.0, 0,
       0, 100000000]
 
@@ -46,7 +46,7 @@ kalman_3D:
       0, 0, 1.0]
 
   # measurement covariance
-  r: 1.0
+  r: 5.0
   R: [10.0, 0, 0,
       0, 100000000, 0,
       0, 0, 100000000]

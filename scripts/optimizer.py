@@ -165,7 +165,8 @@ class ConeFitter:
 
         self.cone_num = rospy.get_param('~cone_num')
         self.constraint_offset = rospy.get_param('~constraint_offset')
-        self._cone_min_dist_ = rospy.get_param('~cone_min_dist')
+        self._cone_mutual_min_dist_enabled_ = rospy.get_param('~cone_mutual_min_dist/enabled')
+        self._cone_mutual_min_dist_distance_ = rospy.get_param('~cone_mutual_min_dist/distance')
         self._fixed_camera_enabled_ = rospy.get_param('~fixed_camera/enabled')
         self._fixed_camera_distance_ = rospy.get_param('~fixed_camera/distance')
         self._exclude_origin_enabled_ = rospy.get_param('~exclude_origin/enabled')
@@ -217,9 +218,9 @@ class ConeFitter:
 
         too_close = False
 
-        if not self._fixed_camera_enabled_:
+        if self._cone_mutual_min_dist_enabled_ and not self._fixed_camera_enabled_:
             for idx,cone in enumerate(self.cones):
-                if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= self._cone_min_dist_:
+                if self.dist3D([data.pose.position.x, data.pose.position.y, data.pose.position.z], [cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) <= self._cone_mutual_min_dist_distance_:
                     too_close = True
                     rospy.loginfo('cone too close')
 
