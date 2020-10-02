@@ -19,7 +19,6 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   nodelet
   cmake_modules
-  gazebo_rad_msgs
   mrs_lib
   rad_msgs
   dynamic_reconfigure
@@ -48,7 +47,7 @@ generate_messages(DEPENDENCIES
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES gdax_interface
-   CATKIN_DEPENDS nodelet rospy std_msgs message_runtime gazebo_rad_msgs mrs_lib rad_msgs
+   CATKIN_DEPENDS nodelet rospy std_msgs message_runtime mrs_lib rad_msgs
    LIBRARIES ComptonFilter TrajectoryPlanner
    DEPENDS Eigen
 )
