@@ -9,7 +9,7 @@ kalman_2D:
   B: []
 
   # process noise
-  q: 0.1
+  q: 0.2
   Q: [1.0, 0,
       0, 1.0]
 
@@ -40,7 +40,7 @@ kalman_3D:
   B: []
 
   # process noise
-  q: 0.1
+  q: 0.2
   Q: [1.0, 0, 0,
       0, 1.0, 0,
       0, 0, 1.0]
@@ -56,4 +56,4 @@ kalman_3D:
       0, 1, 0,
       0, 0, 1]
 
-  max_projection_error: !degrees 30
+  max_projection_error: !degrees 45

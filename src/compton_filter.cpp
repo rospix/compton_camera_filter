@@ -79,6 +79,8 @@ private:
   // | -------------------------- libs -------------------------- |
 
   mrs_lib::BatchVisualizer batch_visualizer_;
+  mrs_lib::BatchVisualizer batch_visualizer_2d_hypo_;
+  mrs_lib::BatchVisualizer batch_visualizer_3d_hypo_;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -225,6 +227,16 @@ void ComptonFilter::onInit() {
   batch_visualizer_.clearBuffers();
   batch_visualizer_.clearVisuals();
 
+  batch_visualizer_2d_hypo_ = mrs_lib::BatchVisualizer(nh_, "hypothesis_2d", _world_frame_);
+
+  batch_visualizer_2d_hypo_.clearBuffers();
+  batch_visualizer_2d_hypo_.clearVisuals();
+
+  batch_visualizer_3d_hypo_ = mrs_lib::BatchVisualizer(nh_, "hypothesis_3d", _world_frame_);
+
+  batch_visualizer_3d_hypo_.clearBuffers();
+  batch_visualizer_3d_hypo_.clearVisuals();
+
   // | ----------------------- subscribers ---------------------- |
 
   subscriber_cone      = nh_.subscribe("cone_in", 1, &ComptonFilter::callbackCone, this, ros::TransportHints().tcpNoDelay());
@@ -342,20 +354,22 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
       ROS_INFO("[ComptonFilter]: angular error too large");
 
-      /* std::scoped_lock lock(mutex_optimizer); */
+      return;
 
-      /* Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_); */
-      /* new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0; */
+      std::scoped_lock lock(mutex_optimizer);
 
-      /* statecov_3d_.P = new_cov3; */
+      Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
+      new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0;
 
-      /* std_srvs::Trigger search_out; */
-      /* /1* service_client_reset.call(search_out); *1/ */
+      statecov_3d_.P = new_cov3;
+
+      std_srvs::Trigger search_out;
+      /* service_client_reset.call(search_out); */
       /* service_client_search.call(search_out); */
 
-      /* ROS_INFO("[ComptonFilter]: calling service for searching"); */
+      ROS_INFO("[ComptonFilter]: calling service for searching");
 
-      /* kalman_initialized = false; */
+      kalman_initialized = false;
     }
 
     // construct the covariance rotation
@@ -507,7 +521,7 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
     ROS_INFO("[ComptonFilter]: initializing KF");
 
     Eigen::Vector2d new_state2;
-    new_state2 << msg->pose.pose.position.x, msg->pose.pose.position.z;
+    new_state2 << msg->pose.pose.position.x, msg->pose.pose.position.y;
 
     Eigen::MatrixXd new_cov2 = Eigen::MatrixXd::Zero(_2d_n_states_, _2d_n_states_);
     new_cov2 << msg->pose.covariance[0] + 1.0, 0, 0, msg->pose.covariance[7] + 1.0;
@@ -574,8 +588,16 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
     return;
   }
 
+  ROS_INFO_THROTTLE(1.0, "[ComptonFilter]: main timer spinning");
+
   statecov_2d_ = lkf_2d_->predict(statecov_2d_, Eigen::VectorXd::Zero(_2d_n_inputs_), Q_2d_, 1.0 / _main_timer_rate_);
   statecov_3d_ = lkf_3d_->predict(statecov_3d_, Eigen::VectorXd::Zero(_3d_n_inputs_), Q_3d_, 1.0 / _main_timer_rate_);
+
+  batch_visualizer_2d_hypo_.clearBuffers();
+  batch_visualizer_2d_hypo_.clearVisuals();
+
+  batch_visualizer_3d_hypo_.clearBuffers();
+  batch_visualizer_3d_hypo_.clearVisuals();
 
   // | ------------------------ 2D kalman ----------------------- |
 
@@ -604,6 +626,14 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
     catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_2d_.getTopic().c_str());
     }
+
+    Eigen::Vector3d cuboid_center(statecov_2d_.x[0], statecov_2d_.x[1], 0);
+    Eigen::Vector3d cuboid_size(1.0, 1.0, 1.0);
+
+    mrs_lib::Cuboid cuboid(cuboid_center, cuboid_size, mrs_lib::AttitudeConverter(0, 0, 0));
+
+    batch_visualizer_2d_hypo_.addCuboid(cuboid, 1.0, 0.0, 0.0, 1.0, true);
+    batch_visualizer_2d_hypo_.addCuboid(cuboid, 0.0, 0.0, 0.0, 1.0, false);
   }
 
   // | ------------------------ 3D kalman ----------------------- |
@@ -636,7 +666,18 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
     catch (...) {
       ROS_ERROR("Exception caught during publishing topic %s.", publisher_3d_.getTopic().c_str());
     }
+
+    Eigen::Vector3d cuboid_center(statecov_3d_.x[0], statecov_3d_.x[1], statecov_3d_.x[2]);
+    Eigen::Vector3d cuboid_size(1.0, 1.0, 1.0);
+
+    mrs_lib::Cuboid cuboid(cuboid_center, cuboid_size, mrs_lib::AttitudeConverter(0, 0, 0));
+
+    batch_visualizer_3d_hypo_.addCuboid(cuboid, 1.0, 0.0, 0.0, 1.0, true);
+    batch_visualizer_3d_hypo_.addCuboid(cuboid, 0.0, 0.0, 0.0, 1.0, false);
   }
+
+  batch_visualizer_2d_hypo_.publish();
+  batch_visualizer_3d_hypo_.publish();
 
   /* { */
   /*   std::scoped_lock lock(mutex_cone_last_time); */
