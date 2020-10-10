@@ -27,6 +27,8 @@ kalman_2D:
 
 kalman_3D:
 
+  max_projection_error: !degrees 30
+
   initial_states: [0, 0, 0.0]
 
   initial_covariance: [100000.0, 0.0, 0.0,
@@ -55,5 +57,3 @@ kalman_3D:
   H: [1, 0, 0,
       0, 1, 0,
       0, 0, 1]
-
-  max_projection_error: !degrees 45

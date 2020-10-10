@@ -20,7 +20,7 @@
       <param name="world_frame" value="$(arg world_frame)" />
 
       <!-- subscribed topics -->
-      <remap from="~cone_in" to="compton_camera/cones" />
+      <remap from="~cone_in" to="compton_cone_generator/cones" />
       <remap from="~optimizer_in" to="cone_optimizer/pose" />
 
       <!-- advertised topics -->

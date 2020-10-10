@@ -354,8 +354,6 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
       ROS_INFO("[ComptonFilter]: angular error too large");
 
-      return;
-
       std::scoped_lock lock(mutex_optimizer);
 
       Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
