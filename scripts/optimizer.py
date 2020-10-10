@@ -77,6 +77,9 @@ class ConeFitter:
 
         if self._fixed_camera_enabled_:
           cons.append({'type': 'eq', 'fun': lambda x: +(x[0]*x[0] + x[1]*x[1] + x[2]*x[2] - self._fixed_camera_distance_)})
+
+        if self._fix_z_enabled_:
+          cons.append({'type': 'eq', 'fun': lambda x: x[2] - self._fix_z_})
     
         return cons
     
@@ -174,6 +177,9 @@ class ConeFitter:
 
         self._min_dist_enabled_ = rospy.get_param('~min_dist/enabled')
         self._min_dist_distance_ = rospy.get_param('~min_dist/distance')
+
+        self._fix_z_enabled_ = rospy.get_param('~fix_z/enabled')
+        self._fix_z_ = rospy.get_param('~fix_z/z')
 
         # subscribers
         rospy.Subscriber("~cone_in", ConeMsg, self.callbackCone, queue_size=1)
