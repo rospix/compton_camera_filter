@@ -12,7 +12,8 @@
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/lkf.h>
-#include <mrs_lib/geometry_utils.h>
+#include <mrs_lib/geometry/misc.h>
+#include <mrs_lib/geometry/cyclic.h>
 #include <mrs_lib/batch_visualizer.h>
 #include <mrs_lib/attitude_converter.h>
 
@@ -21,6 +22,16 @@
 #include <std_srvs/Trigger.h>
 
 #include <dynamic_reconfigure/server.h>
+
+//}
+
+/* using //{ */
+
+using vec2_t = mrs_lib::geometry::vec_t<2>;
+using vec3_t = mrs_lib::geometry::vec_t<3>;
+
+using radians  = mrs_lib::geometry::radians;
+using sradians = mrs_lib::geometry::sradians;
 
 //}
 
@@ -167,7 +178,7 @@ private:
   // | ----------------------- roroutines ----------------------- |
 
   void                           initializeKalmans(const double x, const double y, const double z);
-  std::optional<Eigen::Vector3d> projectPointOnCone(mrs_lib::Cone& cone, const Eigen::Vector3d& point);
+  std::optional<Eigen::Vector3d> projectPointOnCone(mrs_lib::geometry::Cone& cone, const Eigen::Vector3d& point);
 };
 //}
 
@@ -320,7 +331,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
   Eigen::Vector3d cone_direction(msg->direction.x, msg->direction.y, msg->direction.z);
   cone_direction.normalize();
 
-  mrs_lib::Cone cone = mrs_lib::Cone(cone_position, msg->angle, 50, cone_direction);
+  mrs_lib::geometry::Cone cone = mrs_lib::geometry::Cone(cone_position, msg->angle, 50, cone_direction);
 
   // | --------------------------- 3D --------------------------- |
   Eigen::Vector3d state_3D(statecov_3d_.x[0], statecov_3d_.x[1], statecov_3d_.x[2]);
@@ -346,7 +357,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     ROS_INFO_STREAM("[ComptonFilter]: dir_to_proj = " << dir_to_proj);
 
     // calculate the angular size of the projection distance
-    double proj_ang_size = mrs_lib::vectorAngle(Eigen::Vector3d(state_3D - cone_position), Eigen::Vector3d(projection - cone_position));
+    double proj_ang_size = mrs_lib::geometry::angleBetween(Eigen::Vector3d(state_3D - cone_position), Eigen::Vector3d(projection - cone_position));
 
     ROS_INFO("[ComptonFilter]: proj_ang_size %.2f deg", (proj_ang_size / M_PI) * 180.0);
 
@@ -371,7 +382,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     /* } */
 
     // construct the covariance rotation
-    double          angle = mrs_lib::vectorAngle(dir_to_proj, e1);
+    double          angle = mrs_lib::geometry::angleBetween(dir_to_proj, e1);
     Eigen::Vector3d axis  = e1.cross(dir_to_proj);
     Eigen::Matrix3d rot   = mrs_lib::AttitudeConverter(Eigen::AngleAxis<double>(angle, axis));
 
@@ -442,7 +453,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     Eigen::Vector3d dir_to_proj = projection_2D - state_2D;
 
     // construct the covariance rotation
-    double          angle = mrs_lib::vectorAngle(dir_to_proj, e1);
+    double          angle = mrs_lib::geometry::angleBetween(dir_to_proj, e1);
     Eigen::Vector3d axis  = e1.cross(dir_to_proj);
     Eigen::Matrix3d rot   = mrs_lib::AttitudeConverter(Eigen::AngleAxis<double>(angle, axis));
 
@@ -628,7 +639,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
     Eigen::Vector3d cuboid_center(statecov_2d_.x[0], statecov_2d_.x[1], 0);
     Eigen::Vector3d cuboid_size(1.0, 1.0, 1.0);
 
-    mrs_lib::Cuboid cuboid(cuboid_center, cuboid_size, mrs_lib::AttitudeConverter(0, 0, 0));
+    mrs_lib::geometry::Cuboid cuboid(cuboid_center, cuboid_size, mrs_lib::AttitudeConverter(0, 0, 0));
 
     batch_visualizer_2d_hypo_.addCuboid(cuboid, 1.0, 0.0, 0.0, 1.0, true);
     batch_visualizer_2d_hypo_.addCuboid(cuboid, 0.0, 0.0, 0.0, 1.0, false);
@@ -668,7 +679,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
     Eigen::Vector3d cuboid_center(statecov_3d_.x[0], statecov_3d_.x[1], statecov_3d_.x[2]);
     Eigen::Vector3d cuboid_size(1.0, 1.0, 1.0);
 
-    mrs_lib::Cuboid cuboid(cuboid_center, cuboid_size, mrs_lib::AttitudeConverter(0, 0, 0));
+    mrs_lib::geometry::Cuboid cuboid(cuboid_center, cuboid_size, mrs_lib::AttitudeConverter(0, 0, 0));
 
     batch_visualizer_3d_hypo_.addCuboid(cuboid, 1.0, 0.0, 0.0, 1.0, true);
     batch_visualizer_3d_hypo_.addCuboid(cuboid, 0.0, 0.0, 0.0, 1.0, false);
@@ -730,10 +741,10 @@ void ComptonFilter::initializeKalmans(const double x, const double y, const doub
 
 /* projectPointOnCone() //{ */
 
-std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::Cone& cone, const Eigen::Vector3d& point) {
+std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::geometry::Cone& cone, const Eigen::Vector3d& point) {
 
   Eigen::Vector3d point_vec        = point - cone.origin();
-  double          point_axis_angle = mrs_lib::vectorAngle(point_vec, cone.direction());
+  double          point_axis_angle = mrs_lib::geometry::angleBetween(point_vec, cone.direction());
 
   /* Eigen::Vector3d axis_projection = this->cone_axis_projector * point_vec + cone.origin(); */
 
@@ -748,7 +759,7 @@ std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::Cone& 
 
     batch_visualizer_.addPoint(point_on_cone, 1.0, 0.0, 0.0, 1.0);
 
-    mrs_lib::Ray ray2(cone.origin(), point);
+    mrs_lib::geometry::Ray ray2(cone.origin(), point);
     batch_visualizer_.addRay(ray2, 0.0, 1.0, 0.0, 1.0);
   }
 
@@ -761,13 +772,13 @@ std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::Cone& 
 
     Eigen::Vector3d projection = cone.origin() + vec_point_on_cone * cos(beta) * point_vec.norm();
 
-    mrs_lib::Ray ray(point, projection);
+    mrs_lib::geometry::Ray ray(point, projection);
     batch_visualizer_.addRay(ray, 1.0, 0.0, 0.0, 1.0);
 
-    mrs_lib::Cuboid cuboid2(projection + vec_point_on_cone * 0.0, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
+    mrs_lib::geometry::Cuboid cuboid2(projection + vec_point_on_cone * 0.0, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
     batch_visualizer_.addCuboid(cuboid2, 1.0, 0.0, 0.0, 1.0);
 
-    mrs_lib::Cuboid cuboid(projection, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
+    mrs_lib::geometry::Cuboid cuboid(projection, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
     batch_visualizer_.addCuboid(cuboid, 0.0, 0.0, 1.0, 1.0);
 
     /* return projection; */
@@ -777,13 +788,13 @@ std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::Cone& 
 
     Eigen::Vector3d projection = cone.origin() + vec_point_on_cone * cos(point_axis_angle - cone.theta()) * point_vec.norm();
 
-    mrs_lib::Ray ray(point, projection);
+    mrs_lib::geometry::Ray ray(point, projection);
     batch_visualizer_.addRay(ray, 1.0, 0.0, 0.0, 1.0);
 
-    mrs_lib::Cuboid cuboid(projection, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
+    mrs_lib::geometry::Cuboid cuboid(projection, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
     batch_visualizer_.addCuboid(cuboid, 0.0, 0.0, 1.0, 1.0);
 
-    mrs_lib::Cuboid cuboid2(projection + vec_point_on_cone * 0.0, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
+    mrs_lib::geometry::Cuboid cuboid2(projection + vec_point_on_cone * 0.0, Eigen::Vector3d(0.3, 0.3, 0.3), mrs_lib::AttitudeConverter(0, 0, 0));
     batch_visualizer_.addCuboid(cuboid2, 1.0, 0.0, 0.0, 1.0);
 
     /* return projection; */
