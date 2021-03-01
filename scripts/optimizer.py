@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import rospy
 
@@ -21,55 +21,55 @@ from std_srvs.srv import TriggerResponse as TriggerSrvResponse
 class ConeFitter:
 
     # #{ dist3D()
-    
+
     def dist3D(self, x, y):
-    
+
         return np.linalg.norm(np.array(x) - np.array(y))
-    
+
     # #} end of dist3D
 
     # #{ coneDist
-    
+
     def coneDist(self, center, direction, theta):
-    
+
         out = self.cone_dist
-    
+
         for idx,x in enumerate(self.sy_center):
-            out = out.subs(x, center[idx]) 
-    
+            out = out.subs(x, center[idx])
+
         for idx,x in enumerate(self.sy_direction):
-            out = out.subs(x, direction[idx]) 
-    
-        out = out.subs(self.sy_theta, theta) 
-    
+            out = out.subs(x, direction[idx])
+
+        out = out.subs(self.sy_theta, theta)
+
         return out
-    
+
     # #} end of coneDist
-    
+
     # #{ multiConeDist
-    
+
     def multiConeDist(self, cc, dd, tt):
-    
+
         out = 1
         for idx,i in enumerate(cc):
-    
+
             out = out + sy.Pow(self.coneDist(cc[idx], dd[idx], tt[idx]), 2)
-    
+
         return out
-    
+
     # #} end of multiConeDist
-    
+
     # #{ generate_constraints
-    
+
     def constraints(self, cc, dd):
-    
+
         cons = []
-    
+
         for idx,i in enumerate(cc):
-    
+
             center = cc[idx]
             direction = dd[idx]
-    
+
             cons.append({'type': 'ineq', 'fun': lambda x: +(direction[0]*(x[0]+direction[0]*self.constraint_offset) + direction[1]*(x[1]+direction[1]*self.constraint_offset) + direction[2]*(x[2]+direction[2]*self.constraint_offset) - (direction[0]*center[0] + direction[1]*center[1] + direction[2]*center[2]))})
 
             if self._min_dist_enabled_:
@@ -80,89 +80,89 @@ class ConeFitter:
 
         if self._fix_z_enabled_:
           cons.append({'type': 'eq', 'fun': lambda x: x[2] - self._fix_z_})
-    
+
         return cons
-    
+
     # #} end of generate_constraints
 
     # #{ substitude_scalar
-    
+
     def subs_scal(self, scal, x, values):
-    
+
         for idx1,var in enumerate(x):
-    
-            scal = scal.subs(var, values[idx1]) 
-    
+
+            scal = scal.subs(var, values[idx1])
+
         return sy.N(scal)
-    
+
     # #} end of substitude_scalar
 
     # #{ substitute_vector
-    
+
     def subs_vec(self, vec, x, values):
-    
+
         out = np.zeros((len(vec)))
-    
+
         for idx1,cell in enumerate(vec):
-    
+
             out[idx1] = self.subs_scal(cell, x, values)
-    
+
         return out
-    
+
     # #} end of substitute_vector
 
     # #{ substitute_matrix
-    
+
     def subs_mat(self, mat, x, values):
-    
+
         out = np.zeros((len(mat), len(mat[0])))
-    
+
         for idx1,vec in enumerate(mat):
-    
+
             out[idx1] = self.subs_vec(vec, x, values)
-    
+
         return out
-    
+
     # #} end of substitute_matrix
 
     # #{ critetion (obsolete, slow)
-    
+
     def f(self, point):
         start = time.time()
         f_value = self.subs_scal(self.func, self.sy_x, point)
         end = time.time()
         print("f_value: {} ({} s)".format(f_value, end-start))
         return f_value
-    
+
     # #} end of critetion (obsolete, slow)
 
     # #{ jacobian (obsolete, slow)
-    
+
     def jacobian(self, point):
         start = time.time()
         jacob = np.array(self.subs_vec(self.J, self.sy_x, point))
         end = time.time()
         print("jacob: {} ({} s)".format(jacob, end-start))
         return jacob
-    
+
     # #} end of jacobian (obsolete, slow)
 
     # #{ hessian (obsolete, slow)
-    
+
     def hessian(self, point):
         return np.matrix(self.subs_mat(self.H, self.sy_x, point))
-    
+
     # #} end of hessian (obsolete, slow)
 
     # #{ __init__()
-    
+
     def __init__(self):
 
         self.is_initialized = False
         self.is_enabled = True
-    
+
         rospy.init_node('cone_fitter', anonymous=True)
-    
+
         # parameters
         self.uav_name_ = rospy.get_param('~uav_name')
 
@@ -195,7 +195,7 @@ class ConeFitter:
         self.got_new_cone = False
 
         self.cones = []
-    
+
         self.sy_x = sy.symbols('x y z')
         self.sy_center = sy.symbols('a b c')
         self.sy_direction = sy.symbols('o p q')
@@ -207,17 +207,17 @@ class ConeFitter:
         self.is_initialized = True
 
         rospy.Timer(rospy.Duration(1.0), self.mainTimer)
-    
+
         rospy.spin()
-    
+
     # #} end of __init__(self)
 
     # #{ callbackCone()
-    
+
     def callbackCone(self, data):
-    
+
         if not self.is_initialized:
-            return 
+            return
 
         rospy.loginfo_once('[ConeFitter]: getting cones')
         self.got_cone = True
@@ -246,12 +246,12 @@ class ConeFitter:
     # #} end of callbackCone()
 
     # #{ callbackEnable()
-    
+
     def callbackEnable(self, req):
 
         if not self.is_initialized:
-            return 
-    
+            return
+
         self.is_enabled = req.data
 
         if self.is_enabled:
@@ -264,16 +264,16 @@ class ConeFitter:
         resp.success = True
 
         return resp
-    
+
     # #} end of callbackEnable
-    
+
     # #{ callbackReset()
-    
+
     def callbackReset(self, req):
 
         if not self.is_initialized:
-            return 
-    
+            return
+
         self.cones = []
 
         rospy.loginfo('[Optimizer]: resetting')
@@ -283,16 +283,16 @@ class ConeFitter:
         resp.success = True
 
         return resp
-    
+
     # #} end of callbackEnable
 
     def mainTimer(self, event):
 
         if not self.is_initialized:
-            return 
+            return
 
         if not self.is_enabled:
-            return 
+            return
 
         if len(self.cones) < self.cone_num:
             rospy.loginfo_throttle(1.0, 'waiting for cones (have {}/{})'.format(len(self.cones), self.cone_num))
@@ -312,8 +312,8 @@ class ConeFitter:
         thetas = []
 
         for idx,cone in enumerate(self.cones):
-            centers.append([cone.pose.position.x, cone.pose.position.y, cone.pose.position.z]) 
-            directions.append([cone.direction.x, cone.direction.y, cone.direction.z]) 
+            centers.append([cone.pose.position.x, cone.pose.position.y, cone.pose.position.z])
+            directions.append([cone.direction.x, cone.direction.y, cone.direction.z])
             thetas.append(cone.angle)
 
         self.func = self.multiConeDist(centers, directions, thetas)
@@ -326,7 +326,7 @@ class ConeFitter:
 
         time_before_lamdification = rospy.Time.now()
 
-        # lamdification        
+        # lamdification
         f = sy.lambdify(self.sy_x, self.func, "math")
         jac = sy.lambdify(self.sy_x, self.J, "math")
 
