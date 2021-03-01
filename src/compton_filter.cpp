@@ -361,25 +361,25 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
     ROS_INFO("[ComptonFilter]: proj_ang_size %.2f deg", (proj_ang_size / M_PI) * 180.0);
 
-    /* if (fabs(proj_ang_size) > max_projection_error_) { */
+    if (fabs(proj_ang_size) > max_projection_error_) {
 
-    /*   ROS_INFO("[ComptonFilter]: angular error too large"); */
+      ROS_INFO("[ComptonFilter]: angular error too large");
 
-    /*   std::scoped_lock lock(mutex_optimizer); */
+      std::scoped_lock lock(mutex_optimizer);
 
-    /*   Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_); */
-    /*   new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0; */
+      Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
+      new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0;
 
-    /*   statecov_3d_.P = new_cov3; */
+      statecov_3d_.P = new_cov3;
 
-    /*   std_srvs::Trigger search_out; */
-    /*   /1* service_client_reset.call(search_out); *1/ */
-    /*   /1* service_client_search.call(search_out); *1/ */
+      std_srvs::Trigger search_out;
+      service_client_reset.call(search_out);
+      service_client_search.call(search_out);
 
-    /*   ROS_INFO("[ComptonFilter]: calling service for searching"); */
+      ROS_INFO("[ComptonFilter]: calling service for searching");
 
-    /*   kalman_initialized = false; */
-    /* } */
+      kalman_initialized = false;
+    }
 
     // construct the covariance rotation
     double          angle = mrs_lib::geometry::angleBetween(dir_to_proj, e1);
