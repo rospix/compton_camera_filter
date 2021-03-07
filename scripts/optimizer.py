@@ -195,6 +195,7 @@ class ConeFitter:
         self.got_new_cone = False
 
         self.cones = []
+        self.cones_frame = ""
 
         self.sy_x = sy.symbols('x y z')
         self.sy_center = sy.symbols('a b c')
@@ -221,6 +222,8 @@ class ConeFitter:
 
         rospy.loginfo_once('[ConeFitter]: getting cones')
         self.got_cone = True
+
+        self.cones_frame = data.header.frame_id
 
         too_close = False
 
@@ -358,7 +361,7 @@ class ConeFitter:
         rospy.loginfo('Optimized for {} cones, max distance {}: total time {}, initialization {}, jacobian {}, lamdification {}, optimization {}'.format(len(self.cones), max_distance, (time_after_optimization - time_start).to_sec(), (time_before_J - time_start).to_sec(), (time_before_lamdification - time_before_J).to_sec(), (time_before_optimization - time_before_lamdification).to_sec(), (time_after_optimization - time_before_optimization).to_sec()))
 
         msg_out = PoseWithCovarianceStampedMsg()
-        msg_out.header.frame_id = self.cones[0].header.frame_id
+        msg_out.header.frame_id = self.cones_frame
         msg_out.header.stamp = rospy.Time.now()
         msg_out.pose.pose.position.x = res.x[0]
         msg_out.pose.pose.position.y = res.x[1]

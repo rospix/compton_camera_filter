@@ -158,7 +158,9 @@ private:
 
   std::unique_ptr<lkf_3d_t> lkf_3d_;
 
-  double max_projection_error_;
+  double _max_projection_error_;
+  int    _n_projection_error_;
+  int    projection_errored_ = 0;
 
   // | ------------------- dynamic reconfigure ------------------ |
 
@@ -222,7 +224,8 @@ void ComptonFilter::onInit() {
   param_loader.loadParam("kalman_3D/r", r_3D_);
   param_loader.loadParam("kalman_3D/q", q_3D_);
 
-  param_loader.loadParam("kalman_3D/max_projection_error", max_projection_error_);
+  param_loader.loadParam("kalman_3D/max_projection_error", _max_projection_error_);
+  param_loader.loadParam("kalman_3D/n_projection_error", _n_projection_error_);
 
   param_loader.loadMatrixDynamic("kalman_3D/initial_covariance", initial_covariance_3D_, _3d_n_states_, _3d_n_states_);
 
@@ -361,9 +364,16 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
     ROS_INFO("[ComptonFilter]: proj_ang_size %.2f deg", (proj_ang_size / M_PI) * 180.0);
 
-    if (fabs(proj_ang_size) > max_projection_error_) {
+    if (fabs(proj_ang_size) > _max_projection_error_) {
 
-      ROS_INFO("[ComptonFilter]: angular error too large");
+      projection_errored_++;
+    } else {
+      projection_errored_ = 0;
+    }
+
+    if (projection_errored_ > _n_projection_error_) {
+
+      ROS_INFO("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
 
       std::scoped_lock lock(mutex_optimizer);
 
