@@ -9,7 +9,7 @@ kalman_2D:
   B: []
 
   # process noise
-  q: 2.0
+  q: 0.2
   Q: [10.0, 0,
       0, 10.0]
 
@@ -43,7 +43,7 @@ kalman_3D:
   B: []
 
   # process noise
-  q: 2.0
+  q: 0.2
   Q: [10.0, 0, 0,
       0, 10.0, 0,
       0, 0, 10.0]
