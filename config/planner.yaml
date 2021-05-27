@@ -17,4 +17,4 @@ searching:
   speed: 6.0
   height: 2.0
   trajectory_steps: 50
-  heading_rate: 0.0
+  heading_rate: 2.0

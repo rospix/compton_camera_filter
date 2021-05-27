@@ -439,7 +439,7 @@ mrs_msgs::TrajectoryReference TrajectoryPlanner::trackingTrajectory(void) {
 
     current_angle += angular_step;
 
-    ROS_INFO("[TrajectoryPlanner]: current_angle: %.2f", current_angle);
+    ROS_INFO_THROTTLE(1.0, "[TrajectoryPlanner]: current angle: %.2f", current_angle);
 
     new_trajectory.points.push_back(new_point);
   }
@@ -507,8 +507,8 @@ mrs_msgs::TrajectoryReference TrajectoryPlanner::searchingTrajectory(void) {
     new_point.position.x = searching_x + searching_radius_ * cos(current_angle);
     new_point.position.y = searching_y + searching_radius_ * sin(current_angle);
     new_point.position.z = searching_height_;
-    /* new_point.heading    = current_heading; */
-    new_point.heading = atan2(new_point.position.y - searching_y, new_point.position.x - searching_x);
+    new_point.heading    = current_heading;
+    /* new_point.heading = atan2(new_point.position.y - searching_y, new_point.position.x - searching_x); */
 
     current_angle += angular_step;
 
@@ -540,13 +540,13 @@ void TrajectoryPlanner::mainTimer([[maybe_unused]] const ros::TimerEvent &event)
 
   if (got_pose) {
 
-    ROS_INFO("[TrajectoryPlanner]: publishing tracking trajectory");
+    ROS_INFO_THROTTLE(1.0, "[TrajectoryPlanner]: publishing tracking trajectory");
 
     new_trajectory = trackingTrajectory();
 
   } else {
 
-    ROS_INFO("[TrajectoryPlanner]: publishing searching trajectory");
+    ROS_INFO_THROTTLE(1.0, "[TrajectoryPlanner]: publishing searching trajectory");
 
     new_trajectory = searchingTrajectory();
   }
