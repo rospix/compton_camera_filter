@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>compton_camera_filter</name>
-  <version>0.0.0</version>
-  <description>Tomas's package</description>
+  <version>0.0.1</version>
+  <description>The Compton filter package</description>
 
   <maintainer email="tomas.baca@fel.cvut.cz">Tomas Baca</maintainer>
 
@@ -10,18 +10,17 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>message_generation</depend>
+  <depend>roscpp</depend>
   <depend>rospy</depend>
   <depend>std_msgs</depend>
   <depend>nodelet</depend>
-  <depend>roscpp</depend>
   <depend>message_runtime</depend>
   <depend>mrs_lib</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>rad_msgs</depend>
 
   <export>
-    <nodelet plugin="${prefix}/plugins.xml" />
+    <nodelet plugin="${prefix}/nodelets.xml" />
   </export>
 
 </package>

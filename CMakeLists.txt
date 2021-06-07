@@ -20,31 +20,15 @@ find_package(catkin REQUIRED COMPONENTS
   mrs_lib
   rad_msgs
   dynamic_reconfigure
-  message_generation
 )
 
 generate_dynamic_reconfigure_options(
   cfg/compton_filter.cfg
-  cfg/trajectory_planner.cfg
   )
-
-# messages for MPC_TRACKER
-add_message_files(DIRECTORY msg FILES
-  Swarm.msg
-  )
-
-## Generate added messages and services with any dependencies listed here
-generate_messages(DEPENDENCIES
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  )
-
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES gdax_interface
    CATKIN_DEPENDS nodelet rospy std_msgs message_runtime mrs_lib rad_msgs
-   LIBRARIES ComptonFilter TrajectoryPlanner
+   LIBRARIES ComptonFilter
    DEPENDS Eigen
 )
 
@@ -66,19 +50,6 @@ add_dependencies(ComptonFilter
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(ComptonFilter
-  ${catkin_LIBRARIES}
-  ${Eigen_LIBRARIES}
-  )
-
-add_library(TrajectoryPlanner src/trajectory_planner.cpp)
-
-add_dependencies(TrajectoryPlanner
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  )
-
-## Specify libraries to link a library or executable target against
-target_link_libraries(TrajectoryPlanner
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
   )

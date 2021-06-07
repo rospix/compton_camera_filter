@@ -1,12 +1,12 @@
-cone_num: 4
+cone_num: 5
 constraint_offset: 0.0 # does not work (and does not make sense)
 
 cone_mutual_min_dist:
   enabled: true
-  distance: 1.0
+  distance: 3.0
 
 fix_z:
-  enabled: true
+  enabled: false
   z: 0.0 # [m]
 
 fixed_camera:
@@ -15,7 +15,7 @@ fixed_camera:
 
 min_dist: # min distance of a solution to each cone center
   enabled: true
-  distance: 1.0 # [m]
+  distance: 3.0 # [m]
 
 exclude_origin:
   enabled: false

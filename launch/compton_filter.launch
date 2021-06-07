@@ -30,7 +30,7 @@
       <remap from="~correction_3d_out" to="~correction_3d" />
 
       <!-- services -->
-      <remap from="~search_out" to="trajectory_planner/search" />
+      <remap from="~search_out" to="compton_localization/search" />
       <remap from="~reset_out" to="cone_optimizer/reset" />
 
     </node>
