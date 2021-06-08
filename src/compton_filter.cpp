@@ -365,15 +365,16 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     ROS_INFO("[ComptonFilter]: proj_ang_size %.2f deg", (proj_ang_size / M_PI) * 180.0);
 
     if (fabs(proj_ang_size) > _max_projection_error_) {
-
       projection_errored_++;
+      ROS_WARN("[ComptonFilter]: projection_errorred_++ = %d", projection_errored_);
     } else {
       projection_errored_ = 0;
+      ROS_WARN("[ComptonFilter]: projection_errorred_ reset");
     }
 
     if (projection_errored_ > _n_projection_error_) {
 
-      ROS_INFO("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
+      ROS_WARN("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
 
       std::scoped_lock lock(mutex_optimizer);
 
