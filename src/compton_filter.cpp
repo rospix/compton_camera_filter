@@ -318,17 +318,17 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
   if (!is_initialized)
     return;
 
-  if (!kalman_initialized) {
-    return;
-  }
-
-  ROS_INFO("[ComptonFilter]: cone received");
-
   {
     std::scoped_lock lock(mutex_cone_last_time);
 
     cone_last_time = ros::Time::now();
   }
+
+  if (!kalman_initialized) {
+    return;
+  }
+
+  ROS_INFO("[ComptonFilter]: cone received");
 
   Eigen::Vector3d cone_position(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
   Eigen::Vector3d cone_direction(msg->direction.x, msg->direction.y, msg->direction.z);
@@ -698,21 +698,21 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
   batch_visualizer_2d_hypo_.publish();
   batch_visualizer_3d_hypo_.publish();
 
-  /* { */
-  /*   std::scoped_lock lock(mutex_cone_last_time); */
+  {
+    std::scoped_lock lock(mutex_cone_last_time);
 
-  /*   if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) { */
+    if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) {
 
-  /*     ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s", no_cone_timeout_); */
+      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s", no_cone_timeout_);
 
-  /*     std_srvs::Trigger search_out; */
-  /*     service_client_search.call(search_out); */
+      std_srvs::Trigger search_out;
+      service_client_search.call(search_out);
 
-  /*     ROS_INFO("[ComptonFilter]: calling service for searching"); */
+      ROS_INFO("[ComptonFilter]: calling service for searching");
 
-  /*     kalman_initialized = false; */
-  /*   } */
-  /* } */
+      kalman_initialized = false;
+    }
+  }
 }
 
 //}
