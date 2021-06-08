@@ -364,7 +364,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
     ROS_INFO("[ComptonFilter]: proj_ang_size %.2f deg", (proj_ang_size / M_PI) * 180.0);
 
-    if (fabs(proj_ang_size) > _max_projection_error_) {
+    if (fabs(proj_ang_size) >= _max_projection_error_) {
       projection_errored_++;
       ROS_WARN("[ComptonFilter]: projection_errorred_++ = %d", projection_errored_);
     } else {
