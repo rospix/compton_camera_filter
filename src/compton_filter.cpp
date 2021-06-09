@@ -372,7 +372,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
       ROS_WARN("[ComptonFilter]: projection_errorred_ reset");
     }
 
-    if (projection_errored_ > _n_projection_error_) {
+    if (projection_errored_ >= _n_projection_error_) {
 
       ROS_WARN("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
 
