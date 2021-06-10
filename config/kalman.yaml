@@ -27,8 +27,8 @@ kalman_2D:
 
 kalman_3D:
 
-  max_projection_error: !degrees 40
-  n_projection_error: 2
+  max_projection_error: !degrees 45
+  n_projection_error: 3
 
   initial_states: [0, 0, 0.0]
 

@@ -20,6 +20,7 @@
 #include <compton_camera_filter/compton_filterConfig.h>
 
 #include <std_srvs/Trigger.h>
+#include <std_srvs/SetBool.h>
 
 #include <dynamic_reconfigure/server.h>
 
@@ -102,8 +103,9 @@ private:
 
   // | --------------------- service cleints -------------------- |
 
-  ros::ServiceClient service_client_search;
-  ros::ServiceClient service_client_reset;
+  ros::ServiceClient service_client_localization_;
+  ros::ServiceClient service_client_sweeper_;
+  ros::ServiceClient service_client_optimizer_reset_;
 
   // | ----------------------- subscribers ---------------------- |
 
@@ -127,6 +129,12 @@ private:
   void       mainTimer(const ros::TimerEvent& event);
 
   bool kalman_initialized = false;
+
+  // | --------------------- service clients -------------------- |
+
+  bool resetOptimizer();
+  bool sweeperActivation(const bool in);
+  bool localizerActivation(const bool in);
 
   // | ------------------------ 2d kalman ----------------------- |
 
@@ -266,8 +274,10 @@ void ComptonFilter::onInit() {
 
   // | --------------------- service clients -------------------- |
 
-  service_client_search = nh_.serviceClient<std_srvs::Trigger>("search_out");
-  service_client_reset  = nh_.serviceClient<std_srvs::Trigger>("reset_out");
+  service_client_sweeper_      = nh_.serviceClient<std_srvs::SetBool>("sweeper_out");
+  service_client_localization_ = nh_.serviceClient<std_srvs::SetBool>("localization_out");
+
+  service_client_optimizer_reset_ = nh_.serviceClient<std_srvs::Trigger>("reset_out");
 
   // | ------------------------- timers ------------------------- |
 
@@ -383,11 +393,11 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
       statecov_3d_.P = new_cov3;
 
-      std_srvs::Trigger search_out;
-      service_client_reset.call(search_out);
-      service_client_search.call(search_out);
+      ROS_INFO("[ComptonFilter]: starting sweeping");
 
-      ROS_INFO("[ComptonFilter]: calling service for searching");
+      resetOptimizer();
+      sweeperActivation(true);
+      localizerActivation(false);
 
       kalman_initialized = false;
     }
@@ -562,6 +572,9 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
     statecov_3d_.P = new_cov3;
 
     kalman_initialized = true;
+
+    sweeperActivation(false);
+    localizerActivation(true);
   }
 }
 
@@ -707,9 +720,13 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
       ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s", no_cone_timeout_);
 
       std_srvs::Trigger search_out;
-      service_client_search.call(search_out);
+      service_client_optimizer_reset_.call(search_out);
 
-      ROS_INFO("[ComptonFilter]: calling service for searching");
+      ROS_INFO("[ComptonFilter]: starting sweeping");
+
+      resetOptimizer();
+      sweeperActivation(true);
+      localizerActivation(false);
 
       kalman_initialized = false;
     }
@@ -744,6 +761,9 @@ void ComptonFilter::initializeKalmans(const double x, const double y, const doub
 
   statecov_3d_.x = new_state3;
   statecov_3d_.P = new_cov3;
+
+  sweeperActivation(false);
+  localizerActivation(true);
 
   kalman_initialized = true;
 }
@@ -815,6 +835,77 @@ std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::geomet
 
     return cone.origin();
   }
+}
+
+//}
+
+/* sweeperActivation() //{ */
+
+bool ComptonFilter::sweeperActivation(const bool in) {
+
+  std_srvs::SetBool srv;
+  srv.request.data = in;
+
+  bool res = service_client_sweeper_.call(srv);
+
+  if (!res) {
+    ROS_ERROR("[ComptonFilter]: failed to call service to sweeper");
+    return false;
+  } else {
+    if (!srv.response.success) {
+      ROS_ERROR("[ComptonFilter]: failed to call service to sweeper: '%s'", srv.response.message.c_str());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+//}
+
+/* localizerActivation() //{ */
+
+bool ComptonFilter::localizerActivation(const bool in) {
+
+  std_srvs::SetBool srv;
+  srv.request.data = in;
+
+  bool res = service_client_localization_.call(srv);
+
+  if (!res) {
+    ROS_ERROR("[ComptonFilter]: failed to call service to localization");
+    return false;
+  } else {
+    if (!srv.response.success) {
+      ROS_ERROR("[ComptonFilter]: failed to call service to localization: '%s'", srv.response.message.c_str());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+//}
+
+/* resetOptimizer() //{ */
+
+bool ComptonFilter::resetOptimizer() {
+
+  std_srvs::Trigger srv;
+
+  bool res = service_client_optimizer_reset_.call(srv);
+
+  if (!res) {
+    ROS_ERROR("[ComptonFilter]: failed to call service to optimizer");
+    return false;
+  } else {
+    if (!srv.response.success) {
+      ROS_ERROR("[ComptonFilter]: failed to call service to optimizer: '%s'", srv.response.message.c_str());
+      return false;
+    }
+  }
+
+  return true;
 }
 
 //}
