@@ -1,3 +1,3 @@
 ```bash
-sudo pip install sympy scipy
+pip install sympy scipy
 ```
