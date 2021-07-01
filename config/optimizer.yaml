@@ -1,4 +1,4 @@
-cone_num: 6
+cone_num: 7
 constraint_offset: 0.0 # does not work (and does not make sense)
 
 cone_mutual_min_dist:
