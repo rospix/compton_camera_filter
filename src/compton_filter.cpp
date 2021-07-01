@@ -328,12 +328,6 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
   if (!is_initialized)
     return;
 
-  {
-    std::scoped_lock lock(mutex_cone_last_time);
-
-    cone_last_time = ros::Time::now();
-  }
-
   if (!kalman_initialized) {
     return;
   }
@@ -377,9 +371,10 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     if (fabs(proj_ang_size) >= _max_projection_error_) {
       projection_errored_++;
       ROS_WARN("[ComptonFilter]: projection_errorred_++ = %d", projection_errored_);
+      return;
     } else {
       projection_errored_ = 0;
-      ROS_WARN("[ComptonFilter]: projection_errorred_ reset");
+      ROS_INFO("[ComptonFilter]: projection_errorred_ reset");
     }
 
     if (projection_errored_ >= _n_projection_error_) {
@@ -400,6 +395,26 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
       localizerActivation(false);
 
       kalman_initialized = false;
+    }
+
+    // check of the cone points to the sky
+    {
+      tf2::Vector3 cone_axis(msg->direction.x, msg->direction.y, msg->direction.z);
+
+      double cone_axis_tilt = acos(cone_axis.dot(tf2::Vector3(0, 0, 1)));
+
+      double cone_lowest_tilt = cone_axis_tilt + msg->angle;
+
+      if (cone_lowest_tilt < M_PI/2.0) {
+        ROS_WARN("[ComptonFilter]: rejecting cone, it points to the sky");
+        return;
+      }
+    }
+
+    {
+      std::scoped_lock lock(mutex_cone_last_time);
+
+      cone_last_time = ros::Time::now();
     }
 
     // construct the covariance rotation
