@@ -1,5 +1,5 @@
 main_timer_rate: 30.0 # [Hz]
-no_cone_timeout: 30.0 # [s]
+no_cone_timeout: 60.0 # [s]
 
 kalman_2D:
 
@@ -9,7 +9,7 @@ kalman_2D:
   B: []
 
   # process noise
-  q: 0.1
+  q: 0.2
   Q: [10.0, 0,
       0, 10.0]
 
@@ -28,7 +28,7 @@ kalman_2D:
 kalman_3D:
 
   max_projection_error: !degrees 45
-  n_projection_error: 3
+  n_projection_error: 5
 
   initial_states: [0, 0, 0.0]
 
@@ -43,7 +43,7 @@ kalman_3D:
   B: []
 
   # process noise
-  q: 0.1
+  q: 0.2
   Q: [10.0, 0, 0,
       0, 10.0, 0,
       0, 0, 10.0]
