@@ -11,7 +11,8 @@
       <param name="uav_name" value="$(arg uav_name)" />
 
       <!-- subscribed topics -->
-      <remap from="~cone_in" to="compton_cone_generator/cones" />
+      <!-- <remap from="~cone_in" to="compton_cone_generator/cones" /> -->
+      <remap from="~cone_in" to="/cones" />
 
       <!-- advertised topics -->
       <remap from="~pose_out" to="~pose" />

@@ -325,8 +325,17 @@ void ComptonFilter::onInit() {
 
 void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
-  if (!is_initialized)
+  if (!is_initialized) {
     return;
+  }
+
+  ROS_INFO_ONCE("[ComptonFilter]: getting cones");
+
+  {
+    std::scoped_lock lock(mutex_cone_last_time);
+
+    cone_last_time = ros::Time::now();
+  }
 
   if (!kalman_initialized) {
     return;
@@ -405,16 +414,10 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
       double cone_lowest_tilt = cone_axis_tilt + msg->angle;
 
-      if (cone_lowest_tilt < M_PI/2.0) {
+      if (cone_lowest_tilt < M_PI / 2.0) {
         ROS_WARN("[ComptonFilter]: rejecting cone, it points to the sky");
         return;
       }
-    }
-
-    {
-      std::scoped_lock lock(mutex_cone_last_time);
-
-      cone_last_time = ros::Time::now();
     }
 
     // construct the covariance rotation
@@ -732,7 +735,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
 
     if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) {
 
-      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s", no_cone_timeout_);
+      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s, last time %f s", no_cone_timeout_, cone_last_time);
 
       std_srvs::Trigger search_out;
       service_client_optimizer_reset_.call(search_out);
