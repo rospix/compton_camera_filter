@@ -1,4 +1,4 @@
-cone_num: 7
+cone_num: 10
 constraint_offset: 0.0 # does not work (and does not make sense)
 
 cone_mutual_min_dist:
@@ -6,7 +6,7 @@ cone_mutual_min_dist:
   distance: 2.0
 
 fix_z:
-  enabled: false
+  enabled: true
   z: 0.0 # [m]
 
 fixed_camera:

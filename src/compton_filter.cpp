@@ -735,7 +735,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
 
     if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) {
 
-      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s, last time %f s", no_cone_timeout_, cone_last_time);
+      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s, last time %f s", no_cone_timeout_, cone_last_time.toSec());
 
       std_srvs::Trigger search_out;
       service_client_optimizer_reset_.call(search_out);
