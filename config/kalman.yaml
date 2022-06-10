@@ -27,8 +27,8 @@ kalman_2D:
 
 kalman_3D:
 
-  max_projection_error: !degrees 50
-  n_projection_error: 2
+  max_projection_error: !degrees 60
+  n_projection_error: 4
 
   initial_states: [0, 0, 0.0]
 
@@ -43,7 +43,7 @@ kalman_3D:
   B: []
 
   # process noise
-  q: 0.4
+  q: 0.6
   Q: [10.0, 0, 0,
       0, 10.0, 0,
       0, 0, 10.0]
