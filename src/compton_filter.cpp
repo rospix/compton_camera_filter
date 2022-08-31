@@ -111,7 +111,7 @@ private:
 
   ros::Subscriber subscriber_cone;
   void            callbackCone(const rad_msgs::ConeConstPtr& msg);
-  ros::Time       cone_last_time;
+  ros::Time       cone_last_time_;
   std::mutex      mutex_cone_last_time;
   double          no_cone_timeout_;
 
@@ -184,6 +184,8 @@ private:
 
   void       callbackDrs(compton_camera_filter::compton_filterConfig& config, uint32_t level);
   std::mutex mutex_drs;
+
+  std::atomic<bool> sweeping_ = true;
 
   // | ----------------------- roroutines ----------------------- |
 
@@ -331,12 +333,6 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
   ROS_INFO_ONCE("[ComptonFilter]: getting cones");
 
-  {
-    std::scoped_lock lock(mutex_cone_last_time);
-
-    cone_last_time = ros::Time::now();
-  }
-
   if (!kalman_initialized) {
     return;
   }
@@ -400,8 +396,9 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
       ROS_INFO("[ComptonFilter]: starting sweeping");
 
       resetOptimizer();
-      zigzaggerActivation();
       localizerActivation(false);
+      ros::Duration(1.0).sleep();
+      zigzaggerActivation();
 
       kalman_initialized = false;
     }
@@ -418,6 +415,12 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
         ROS_WARN("[ComptonFilter]: rejecting cone, it points to the sky");
         return;
       }
+    }
+
+    {
+      std::scoped_lock lock(mutex_cone_last_time);
+
+      cone_last_time_ = ros::Time::now();
     }
 
     // construct the covariance rotation
@@ -732,9 +735,9 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
   {
     std::scoped_lock lock(mutex_cone_last_time);
 
-    if ((ros::Time::now() - cone_last_time).toSec() > no_cone_timeout_) {
+    if (!sweeping_ && (ros::Time::now() - cone_last_time_).toSec() > no_cone_timeout_) {
 
-      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s, last time %f s", no_cone_timeout_, cone_last_time.toSec());
+      ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s, last time %f s", no_cone_timeout_, cone_last_time_.toSec());
 
       std_srvs::Trigger search_out;
       service_client_optimizer_reset_.call(search_out);
@@ -742,8 +745,9 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
       ROS_INFO("[ComptonFilter]: starting sweeping");
 
       resetOptimizer();
-      zigzaggerActivation();
       localizerActivation(false);
+      ros::Duration(1.0).sleep();
+      zigzaggerActivation();
 
       kalman_initialized = false;
     }
@@ -859,6 +863,8 @@ std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::geomet
 
 bool ComptonFilter::zigzaggerActivation() {
 
+  sweeping_ = true;
+
   std_srvs::SetBool srv;
   srv.request.data = 1;
 
@@ -882,6 +888,15 @@ bool ComptonFilter::zigzaggerActivation() {
 /* localizerActivation() //{ */
 
 bool ComptonFilter::localizerActivation(const bool in) {
+
+  if (in) {
+    {
+      std::scoped_lock lock(mutex_cone_last_time);
+
+      cone_last_time_ = ros::Time::now();
+    }
+    sweeping_       = false;
+  }
 
   std_srvs::SetBool srv;
   srv.request.data = in;
