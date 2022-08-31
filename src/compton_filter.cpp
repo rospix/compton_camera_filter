@@ -133,7 +133,7 @@ private:
   // | --------------------- service clients -------------------- |
 
   bool resetOptimizer();
-  bool sweeperActivation(const bool in);
+  bool zigzaggerActivation();
   bool localizerActivation(const bool in);
 
   // | ------------------------ 2d kalman ----------------------- |
@@ -400,7 +400,7 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
       ROS_INFO("[ComptonFilter]: starting sweeping");
 
       resetOptimizer();
-      sweeperActivation(true);
+      zigzaggerActivation();
       localizerActivation(false);
 
       kalman_initialized = false;
@@ -591,7 +591,6 @@ void ComptonFilter::callbackOptimizer(const geometry_msgs::PoseWithCovarianceSta
 
     kalman_initialized = true;
 
-    sweeperActivation(false);
     localizerActivation(true);
   }
 }
@@ -743,7 +742,7 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
       ROS_INFO("[ComptonFilter]: starting sweeping");
 
       resetOptimizer();
-      sweeperActivation(true);
+      zigzaggerActivation();
       localizerActivation(false);
 
       kalman_initialized = false;
@@ -780,7 +779,6 @@ void ComptonFilter::initializeKalmans(const double x, const double y, const doub
   statecov_3d_.x = new_state3;
   statecov_3d_.P = new_cov3;
 
-  sweeperActivation(false);
   localizerActivation(true);
 
   kalman_initialized = true;
@@ -859,19 +857,19 @@ std::optional<Eigen::Vector3d> ComptonFilter::projectPointOnCone(mrs_lib::geomet
 
 /* sweeperActivation() //{ */
 
-bool ComptonFilter::sweeperActivation(const bool in) {
+bool ComptonFilter::zigzaggerActivation() {
 
   std_srvs::SetBool srv;
-  srv.request.data = in;
+  srv.request.data = 1;
 
   bool res = service_client_sweeper_.call(srv);
 
   if (!res) {
-    ROS_ERROR("[ComptonFilter]: failed to call service to sweeper");
+    ROS_ERROR("[ComptonFilter]: failed to call service to zigzagger");
     return false;
   } else {
     if (!srv.response.success) {
-      ROS_ERROR("[ComptonFilter]: failed to call service to sweeper: '%s'", srv.response.message.c_str());
+      ROS_ERROR("[ComptonFilter]: failed to call service to zigzagger: '%s'", srv.response.message.c_str());
       return false;
     }
   }

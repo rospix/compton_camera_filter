@@ -9,12 +9,12 @@ kalman_2D:
   B: []
 
   # process noise
-  q: 0.3
+  q: 2.0
   Q: [10.0, 0,
       0, 10.0]
 
   # measurement covariance
-  r: 1.0
+  r: 100
   R: [1.0, 0,
       0, 100000000]
 
@@ -28,7 +28,7 @@ kalman_2D:
 kalman_3D:
 
   max_projection_error: !degrees 60
-  n_projection_error: 4
+  n_projection_error: 6
 
   initial_states: [0, 0, 0.0]
 
@@ -43,13 +43,13 @@ kalman_3D:
   B: []
 
   # process noise
-  q: 0.6
+  q: 2.0
   Q: [10.0, 0, 0,
       0, 10.0, 0,
       0, 0, 10.0]
 
   # measurement covariance
-  r: 1.0
+  r: 100
   R: [10.0, 0, 0,
       0, 100000000, 0,
       0, 0, 100000000]
