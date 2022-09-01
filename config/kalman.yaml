@@ -1,6 +1,9 @@
 main_timer_rate: 30.0 # [Hz]
 no_cone_timeout: 30.0 # [s]
 
+max_projection_error: !degrees 90
+n_projection_error: 6
+
 kalman_2D:
 
   A: [1, 0,
@@ -26,9 +29,6 @@ kalman_2D:
                        0.0, 10000.0]
 
 kalman_3D:
-
-  max_projection_error: !degrees 90
-  n_projection_error: 6
 
   initial_states: [0, 0, 0.0]
 
