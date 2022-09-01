@@ -234,8 +234,8 @@ void ComptonFilter::onInit() {
   param_loader.loadParam("kalman_3D/r", r_3D_);
   param_loader.loadParam("kalman_3D/q", q_3D_);
 
-  param_loader.loadParam("kalman_3D/max_projection_error", _max_projection_error_);
-  param_loader.loadParam("kalman_3D/n_projection_error", _n_projection_error_);
+  param_loader.loadParam("max_projection_error", _max_projection_error_);
+  param_loader.loadParam("n_projection_error", _n_projection_error_);
 
   param_loader.loadMatrixDynamic("kalman_3D/initial_covariance", initial_covariance_3D_, _3d_n_states_, _3d_n_states_);
 
@@ -345,6 +345,30 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
   mrs_lib::geometry::Cone cone = mrs_lib::geometry::Cone(cone_position, msg->angle, 50, cone_direction);
 
+  if (projection_errored_ >= _n_projection_error_) {
+
+    ROS_WARN("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
+
+    std::scoped_lock lock(mutex_optimizer);
+
+    Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
+    new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0;
+
+    statecov_3d_.P = new_cov3;
+
+    ROS_INFO("[ComptonFilter]: restarting hypothesis");
+
+    /* resetOptimizer(); */
+    /* localizerActivation(false); */
+    /* ros::Duration(1.0).sleep(); */
+    /* zigzaggerActivation(); */
+
+    kalman_initialized  = false;
+    projection_errored_ = 0;
+
+    return;
+  }
+
   // | --------------------------- 3D --------------------------- |
   Eigen::Vector3d state_3D(statecov_3d_.x[0], statecov_3d_.x[1], statecov_3d_.x[2]);
   ROS_INFO_STREAM("[ComptonFilter]: state_3D = " << state_3D);
@@ -380,27 +404,6 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     } else {
       projection_errored_ = 0;
       ROS_INFO("[ComptonFilter]: projection_errorred_ reset");
-    }
-
-    if (projection_errored_ >= _n_projection_error_) {
-
-      ROS_WARN("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
-
-      std::scoped_lock lock(mutex_optimizer);
-
-      Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
-      new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0;
-
-      statecov_3d_.P = new_cov3;
-
-      ROS_INFO("[ComptonFilter]: starting sweeping");
-
-      resetOptimizer();
-      localizerActivation(false);
-      ros::Duration(1.0).sleep();
-      zigzaggerActivation();
-
-      kalman_initialized = false;
     }
 
     // check of the cone points to the sky
@@ -739,9 +742,6 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
 
       ROS_INFO("[ComptonFilter]: no cones arrived for more than %.2f s, last time %f s", no_cone_timeout_, cone_last_time_.toSec());
 
-      std_srvs::Trigger search_out;
-      service_client_optimizer_reset_.call(search_out);
-
       ROS_INFO("[ComptonFilter]: starting sweeping");
 
       resetOptimizer();
@@ -749,7 +749,8 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
       ros::Duration(1.0).sleep();
       zigzaggerActivation();
 
-      kalman_initialized = false;
+      kalman_initialized  = false;
+      projection_errored_ = 0;
     }
   }
 }
@@ -895,7 +896,7 @@ bool ComptonFilter::localizerActivation(const bool in) {
 
       cone_last_time_ = ros::Time::now();
     }
-    sweeping_       = false;
+    sweeping_ = false;
   }
 
   std_srvs::SetBool srv;
