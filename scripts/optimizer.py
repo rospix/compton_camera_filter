@@ -159,7 +159,7 @@ class ConeFitter:
     def __init__(self):
 
         self.is_initialized = False
-        self.is_enabled = True
+        self.is_enabled = False
 
         rospy.init_node('cone_fitter', anonymous=True)
 
