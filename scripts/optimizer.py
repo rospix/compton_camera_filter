@@ -221,6 +221,11 @@ class ConeFitter:
             return
 
         rospy.loginfo_once('[ConeFitter]: getting cones')
+
+        if not self.is_enabled:
+            rospy.loginfo_throttle(1.0, 'getting cones, not enabled')
+            return
+
         self.got_cone = True
 
         self.cones_frame = data.header.frame_id
