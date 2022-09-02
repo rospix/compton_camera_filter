@@ -345,28 +345,19 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
 
   mrs_lib::geometry::Cone cone = mrs_lib::geometry::Cone(cone_position, msg->angle, 50, cone_direction);
 
-  if (projection_errored_ >= _n_projection_error_) {
+  // check of the cone points to the sky
+  {
+    tf2::Vector3 cone_axis(msg->direction.x, msg->direction.y, msg->direction.z);
 
-    ROS_WARN("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
+    double cone_axis_tilt = acos(cone_axis.dot(tf2::Vector3(0, 0, 1)));
 
-    std::scoped_lock lock(mutex_optimizer);
+    double cone_lowest_tilt = cone_axis_tilt + msg->angle;
 
-    Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
-    new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0;
-
-    statecov_3d_.P = new_cov3;
-
-    ROS_INFO("[ComptonFilter]: restarting hypothesis");
-
-    /* resetOptimizer(); */
-    /* localizerActivation(false); */
-    /* ros::Duration(1.0).sleep(); */
-    /* zigzaggerActivation(); */
-
-    kalman_initialized  = false;
-    projection_errored_ = 0;
-
-    return;
+    if (cone_lowest_tilt < M_PI / 2.0) {
+      ROS_WARN("[ComptonFilter]: rejecting cone, it points to the sky");
+      projection_errored_++;
+      return;
+    }
   }
 
   // | --------------------------- 3D --------------------------- |
@@ -404,20 +395,6 @@ void ComptonFilter::callbackCone(const rad_msgs::ConeConstPtr& msg) {
     } else {
       projection_errored_ = 0;
       ROS_INFO("[ComptonFilter]: projection_errorred_ reset");
-    }
-
-    // check of the cone points to the sky
-    {
-      tf2::Vector3 cone_axis(msg->direction.x, msg->direction.y, msg->direction.z);
-
-      double cone_axis_tilt = acos(cone_axis.dot(tf2::Vector3(0, 0, 1)));
-
-      double cone_lowest_tilt = cone_axis_tilt + msg->angle;
-
-      if (cone_lowest_tilt < M_PI / 2.0) {
-        ROS_WARN("[ComptonFilter]: rejecting cone, it points to the sky");
-        return;
-      }
     }
 
     {
@@ -752,6 +729,30 @@ void ComptonFilter::mainTimer([[maybe_unused]] const ros::TimerEvent& event) {
       kalman_initialized  = false;
       projection_errored_ = 0;
     }
+  }
+
+  if (projection_errored_ >= _n_projection_error_) {
+
+    ROS_WARN("[ComptonFilter]: angular error too large for more than #%d times", projection_errored_);
+
+    std::scoped_lock lock(mutex_optimizer);
+
+    Eigen::MatrixXd new_cov3 = Eigen::MatrixXd::Zero(_3d_n_states_, _3d_n_states_);
+    new_cov3 << optimizer.pose.covariance[0] + 1.0, 0, 0, 0, optimizer.pose.covariance[7] + 1.0, 0, 0, 0, optimizer.pose.covariance[14] + 1.0;
+
+    statecov_3d_.P = new_cov3;
+
+    ROS_INFO("[ComptonFilter]: restarting hypothesis");
+
+    /* resetOptimizer(); */
+    /* localizerActivation(false); */
+    /* ros::Duration(1.0).sleep(); */
+    /* zigzaggerActivation(); */
+
+    kalman_initialized  = false;
+    projection_errored_ = 0;
+
+    return;
   }
 }
 
