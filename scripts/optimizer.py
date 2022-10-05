@@ -15,7 +15,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped as PoseWithCovarianceSta
 from std_srvs.srv import SetBool as SetBoolSrv
 from std_srvs.srv import Trigger as TriggerSrv
 
-from std_srvs.srv import SetBoolResponse as SetBoolSrvReponse
+from std_srvs.srv import SetBoolResponse as SetBoolSrvResponse
 from std_srvs.srv import TriggerResponse as TriggerSrvResponse
 
 class ConeFitter:
